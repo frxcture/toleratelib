@@ -1,8 +1,8 @@
 local x = {
 	WindowOpenState = false,
-	Theme = { Accent = Color3.fromRGB(255, 255, 255) },
+	Theme = { Accent = Color3.fromRGB(0, 0, 0) },
 	ResizeHandles = {},
-	dpc = Color3.fromRGB(255, 255, 255),
+	dpc = Color3.fromRGB(0, 0, 0),
 }
 local function __VantageLoadLunoria()
 local InputService = game:GetService('UserInputService');
@@ -4000,13 +4000,13 @@ if __ok and type(__lib) == "table" then
 	__VantageLunoriaToggles = (getgenv and getgenv().Toggles) or {}
 	local F = __VantageLunoria
 	if type(F.GetDarkerColor) == "function" then
-		F.AccentColor = Color3.fromRGB(255, 255, 255)
+		F.AccentColor = Color3.fromRGB(0, 0, 0)
 		F.AccentColorDark = F:GetDarkerColor(F.AccentColor)
-		F.MainColor = Color3.fromRGB(28, 29, 35)
-		F.BackgroundColor = Color3.fromRGB(15, 15, 15)
-		F.OutlineColor = Color3.fromRGB(33, 36, 44)
-		F.FontColor = Color3.fromRGB(210, 210, 210)
-		F.Black = Color3.fromRGB(9, 9, 9)
+		F.MainColor = Color3.fromRGB(255, 255, 255)
+		F.BackgroundColor = Color3.fromRGB(240, 240, 240)
+		F.OutlineColor = Color3.fromRGB(205, 205, 205)
+		F.FontColor = Color3.fromRGB(15, 15, 15)
+		F.Black = Color3.fromRGB(0, 0, 0)
 		if type(F.UpdateColorsUsingRegistry) == "function" then
 			pcall(function() F:UpdateColorsUsingRegistry() end)
 		end
