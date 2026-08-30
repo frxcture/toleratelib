@@ -4,7 +4,7 @@ local x = {
 	ResizeHandles = {},
 	dpc = Color3.fromRGB(255, 255, 255),
 }
-local function __VantageLoadLunoria()
+local function tolerateload()
 local InputService = game:GetService('UserInputService');
 local TextService = game:GetService('TextService');
 local CoreGui = game:GetService('CoreGui');
@@ -188,8 +188,8 @@ function Library:MakeDraggable(Instance, Cutoff, UseDragOutline)
         local Color = Library.dpc;
         pcall(function()
             local Env = getgenv and getgenv();
-            if Env and typeof(Env.__VantageDragOutlineColor) == "Color3" then
-                Color = Env.__VantageDragOutlineColor;
+            if Env and typeof(Env.toleratedragcolor) == "Color3" then
+                Color = Env.toleratedragcolor;
             end;
         end);
         return Color or Library.AccentColor or Color3.fromRGB(255, 255, 255);
@@ -1551,7 +1551,7 @@ do
         end
 
         Label.BlankInstance = Groupbox:AddBlank(5);
-        Label.__VantageParts = { TextLabel, Label.BlankInstance };
+        Label.tolerateparts = { TextLabel, Label.BlankInstance };
         Groupbox:Resize();
 
         return Label;
@@ -2117,7 +2117,7 @@ do
         Toggle.TextLabel = ToggleLabel;
         Toggle.Container = Container;
         Toggle.Instance = ToggleOuter;
-        Toggle.__VantageParts = { ToggleOuter, Toggle.BlankInstance };
+        Toggle.tolerateparts = { ToggleOuter, Toggle.BlankInstance };
         setmetatable(Toggle, BaseAddons);
 
         Toggles[Idx] = Toggle;
@@ -2302,6 +2302,14 @@ do
             Library:SafeCallback(Slider.Changed, Slider.Value);
         end;
 
+        function Slider:SetVisible(Visible)
+            for _, Part in next, Slider.tolerateparts do
+                local P = (typeof(Part) == "Instance") and Part or Part.Instance;
+                if P then P.Visible = Visible; end;
+            end;
+            Groupbox:Resize();
+        end;
+
         SliderInner.InputBegan:Connect(function(Input)
             if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
                 local mPos = Mouse.X;
@@ -2337,7 +2345,7 @@ do
         Options[Idx] = Slider;
         Slider.Instance = SliderOuter;
         Slider.LabelInstance = SliderLabel;
-        Slider.__VantageParts = { SliderOuter, SliderLabel, SliderLabelGap, SliderBottomBlank };
+        Slider.tolerateparts = { SliderOuter, SliderLabel, SliderLabelGap, SliderBottomBlank };
 
         return Slider;
     end;
@@ -3872,8 +3880,8 @@ function Library:CreateWindow(...)
 
     if Config.AutoShow then task.spawn(Library.Toggle) end
 
-    local VantageNativeResizeGrip = Library:Create('TextButton', {
-        Name = 'VantageResizeGrip';
+    local tolerategrip = Library:Create('TextButton', {
+        Name = 'tolerategrip';
         Text = '';
         AutoButtonColor = false;
         BackgroundColor3 = (x and x.Theme and x.Theme.Accent) or Library.AccentColor;
@@ -3886,24 +3894,24 @@ function Library:CreateWindow(...)
         Parent = Outer;
     });
 
-    VantageNativeResizeGrip.Active = true;
-    VantageNativeResizeGrip.Selectable = false;
+    tolerategrip.Active = true;
+    tolerategrip.Selectable = false;
 
     Library:Create('UICorner', {
         CornerRadius = UDim.new(0, 1);
-        Parent = VantageNativeResizeGrip;
+        Parent = tolerategrip;
     });
 
-    local function VantageGripDot(X, Y)
+    local function toleratedot(X, Y)
         local Dot = Library:Create('Frame', {
-            Name = 'VantageResizeGripLine';
-            BackgroundColor3 = VantageNativeResizeGrip.BackgroundColor3;
+            Name = 'tolerategripline';
+            BackgroundColor3 = tolerategrip.BackgroundColor3;
             BorderSizePixel = 0;
             AnchorPoint = Vector2.new(1, 1);
             Position = UDim2.new(1, -X, 1, -Y);
             Size = UDim2.fromOffset(3, 3);
-            ZIndex = VantageNativeResizeGrip.ZIndex + 1;
-            Parent = VantageNativeResizeGrip;
+            ZIndex = tolerategrip.ZIndex + 1;
+            Parent = tolerategrip;
         });
         Library:Create('UICorner', {
             CornerRadius = UDim.new(1, 0);
@@ -3912,14 +3920,14 @@ function Library:CreateWindow(...)
         return Dot;
     end;
 
-    VantageGripDot(5, 5);
-    VantageGripDot(10, 5);
-    VantageGripDot(15, 5);
-    VantageGripDot(5, 10);
-    VantageGripDot(10, 10);
-    VantageGripDot(5, 15);
+    toleratedot(5, 5);
+    toleratedot(10, 5);
+    toleratedot(15, 5);
+    toleratedot(5, 10);
+    toleratedot(10, 10);
+    toleratedot(5, 15);
 
-    local function VantageNormalizeOuterAnchor()
+    local function toleratenormalize()
         if Outer.AnchorPoint == Vector2.new(0, 0) then
             return;
         end;
@@ -3932,12 +3940,12 @@ function Library:CreateWindow(...)
         Outer.Position = UDim2.fromOffset(math.floor(Abs.X - ParentAbs.X + 0.5), math.floor(Abs.Y - ParentAbs.Y + 0.5));
     end;
 
-    VantageNativeResizeGrip.InputBegan:Connect(function(Input)
+    tolerategrip.InputBegan:Connect(function(Input)
         if Input.UserInputType ~= Enum.UserInputType.MouseButton1 and Input.UserInputType ~= Enum.UserInputType.Touch then
             return;
         end;
 
-        VantageNormalizeOuterAnchor();
+        toleratenormalize();
         local StartMouse = InputService:GetMouseLocation();
         local StartSize = Outer.AbsoluteSize;
         local Dragging = true;
@@ -3964,7 +3972,7 @@ function Library:CreateWindow(...)
 
     if x then
         x.ResizeHandles = x.ResizeHandles or {};
-        x.ResizeHandles[Outer] = VantageNativeResizeGrip;
+        x.ResizeHandles[Outer] = tolerategrip;
     end;
 
     Window.Holder = Outer;
@@ -3988,17 +3996,17 @@ Players.PlayerRemoving:Connect(OnPlayerChange);
 getgenv().Library = Library
 return Library
 end
-local __ok, __lib = pcall(__VantageLoadLunoria)
+local __ok, __lib = pcall(tolerateload)
 if __ok and type(__lib) == "table" then
-	__VantageLunoria = __lib
-	__VantageLunoria.dpc = x.dpc or Color3.fromRGB(255, 255, 255)
+	toleratelib = __lib
+	toleratelib.dpc = x.dpc or Color3.fromRGB(255, 255, 255)
 	pcall(function()
 		local J = getgenv and getgenv()
-		if J then J.__VantageDragOutlineColor = __VantageLunoria.dpc end
+		if J then J.toleratedragcolor = toleratelib.dpc end
 	end)
-	__VantageLunoriaOptions = (getgenv and getgenv().Options) or {}
-	__VantageLunoriaToggles = (getgenv and getgenv().Toggles) or {}
-	local F = __VantageLunoria
+	tolerateopts = (getgenv and getgenv().Options) or {}
+	toleratetoggles = (getgenv and getgenv().Toggles) or {}
+	local F = toleratelib
 	if type(F.GetDarkerColor) == "function" then
 		F.AccentColor = Color3.fromRGB(255, 255, 255)
 		F.AccentColorDark = F:GetDarkerColor(F.AccentColor)
