@@ -1,4 +1,4 @@
---yoo
+--hey ur not supposed to see ts.
 local x = {
 	WindowOpenState = false,
 	Theme = { Accent = Color3.fromRGB(255, 255, 255) },
@@ -37,11 +37,11 @@ local Library = {
 
     HudRegistry = {};
 
-    FontColor = Color3.fromRGB(220, 220, 220);
-    MainColor = Color3.fromRGB(0, 0, 0);
+    FontColor = Color3.fromRGB(255, 255, 255);
+    MainColor = Color3.fromRGB(21, 21, 21);
     BackgroundColor = Color3.fromRGB(22, 22, 22);
-    AccentColor = Color3.fromRGB(255, 255, 255);
-    OutlineColor = Color3.fromRGB(210, 210, 210);
+    AccentColor = Color3.fromRGB(52, 52, 52);
+    OutlineColor = Color3.fromRGB(53, 53, 53);
     RiskColor = Color3.fromRGB(255, 50, 50),
 
     Black = Color3.fromRGB(9, 9, 9);
