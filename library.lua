@@ -1,4 +1,4 @@
---hey ur not supposed to see ts.
+--ee
 local x = {
 	WindowOpenState = false,
 	Theme = { Accent = Color3.fromRGB(255, 255, 255) },
