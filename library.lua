@@ -1,7 +1,7 @@
---r
+--re
 local x = {
 	WindowOpenState = false,
-	Theme = { Accent = Color3.fromRGB(255, 255, 255) },
+	Theme = { Accent = Color3.fromRGB(52, 52, 52) },
 	ResizeHandles = {},
 	dpc = Color3.fromRGB(255, 255, 255),
 }
@@ -4009,13 +4009,13 @@ if __ok and type(__lib) == "table" then
 	toleratetoggles = (getgenv and getgenv().Toggles) or {}
 	local F = toleratelib
 	if type(F.GetDarkerColor) == "function" then
-		F.AccentColor = Color3.fromRGB(255, 255, 255)
+		F.AccentColor = Color3.fromRGB(52, 52, 52)
 		F.AccentColorDark = F:GetDarkerColor(F.AccentColor)
-		F.MainColor = Color3.fromRGB(0, 0, 0)
+		F.MainColor = Color3.fromRGB(21, 21, 21)
 		F.BackgroundColor = Color3.fromRGB(22, 22, 22)
-		F.OutlineColor = Color3.fromRGB(210, 210, 210)
-		F.FontColor = Color3.fromRGB(220, 220, 220)
-		F.Black = Color3.fromRGB(0, 0, 0)
+		F.OutlineColor = Color3.fromRGB(53, 53, 53)
+		F.FontColor = Color3.fromRGB(255, 255, 255)
+		F.Black = Color3.fromRGB(9, 9, 9)
 		if type(F.UpdateColorsUsingRegistry) == "function" then
 			pcall(function() F:UpdateColorsUsingRegistry() end)
 		end
