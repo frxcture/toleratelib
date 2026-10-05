@@ -1,4 +1,3 @@
---core
 local x = {
 	WindowOpenState = false,
 	Theme = { Accent = Color3.fromRGB(52, 52, 52) },
@@ -3929,4 +3928,3 @@ if __ok and type(__lib) == "table" then
 	if getgenv then getgenv().Library = F end
 	return F
 end
-error(tostring(__lib), 0)
