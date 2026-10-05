@@ -1,4 +1,4 @@
---re
+--core
 local x = {
 	WindowOpenState = false,
 	Theme = { Accent = Color3.fromRGB(52, 52, 52) },
@@ -32,12 +32,13 @@ getgenv().Toggles = Toggles;
 getgenv().Options = Options;
 
 local Library = {
-    Registry = {};
-    RegistryMap = {};
+Registry = {};
+RegistryMap = {};
 
-    HudRegistry = {};
+HudRegistry = {};
 
-    FontColor = Color3.fromRGB(255, 255, 255);
+WindowOpen = false;
+FontColor = Color3.fromRGB(255, 255, 255);
     MainColor = Color3.fromRGB(21, 21, 21);
     BackgroundColor = Color3.fromRGB(22, 22, 22);
     AccentColor = Color3.fromRGB(52, 52, 52);
@@ -3749,132 +3750,37 @@ function Library:CreateWindow(...)
         Parent = ScreenGui;
     });
 
-    local TransparencyCache = {};
-    local Toggled = false;
-    local Fading = false;
+local TransparencyCache = {};
+local Toggled = false;
+local Fading = false;
+local ToggleToken = 0;
 
-    function Library:Toggle()
-        if Fading then
-            return;
+function Library:Toggle()
+    Toggled = (not Toggled);
+    local NowOpen = Toggled == true;
+    if not NowOpen then
+        for Frame, _ in next, Library.OpenedFrames do
+            Frame.Visible = false;
+            Library.OpenedFrames[Frame] = nil;
         end;
-
-        local FadeTime = Config.MenuFadeTime;
-        Fading = true;
-        Toggled = (not Toggled);
-        if not Toggled then
-            for Frame, _ in next, Library.OpenedFrames do
-                Frame.Visible = false;
-                Library.OpenedFrames[Frame] = nil;
-            end;
+    end;
+    ModalElement.Modal = Toggled;
+    Outer.Visible = NowOpen;
+    if x then
+        x.WindowOpenState = NowOpen;
+        if x.SetBackgroundEffectsVisible then
+            x:SetBackgroundEffectsVisible(NowOpen, not NowOpen);
         end;
-        ModalElement.Modal = Toggled;
-        if x then
-            x.WindowOpenState = Toggled == true;
-            if x.SetBackgroundEffectsVisible then
-                x:SetBackgroundEffectsVisible(x.WindowOpenState, not x.WindowOpenState);
-            end;
-        end;
-
-        if false and Toggled then
-
-            Outer.Visible = true;
-
-            task.spawn(function()
-
-                local State = InputService.MouseIconEnabled;
-
-
-                if not Drawing or type(Drawing.new) ~= "function" then
-                    InputService.MouseIconEnabled = true;
-                    return;
-                end;
-
-                local Cursor = Drawing.new('Triangle');
-                Cursor.Thickness = 1;
-                Cursor.Filled = true;
-                Cursor.Visible = true;
-
-                local CursorOutline = Drawing.new('Triangle');
-                CursorOutline.Thickness = 1;
-                CursorOutline.Filled = false;
-                CursorOutline.Color = Color3.new(0, 0, 0);
-                CursorOutline.Visible = true;
-
-                while Toggled and ScreenGui.Parent do
-                    InputService.MouseIconEnabled = false;
-
-                    local mPos = InputService:GetMouseLocation();
-
-                    Cursor.Color = Library.AccentColor;
-
-                    Cursor.PointA = Vector2.new(mPos.X, mPos.Y);
-                    Cursor.PointB = Vector2.new(mPos.X + 16, mPos.Y + 6);
-                    Cursor.PointC = Vector2.new(mPos.X + 6, mPos.Y + 16);
-
-                    CursorOutline.PointA = Cursor.PointA;
-                    CursorOutline.PointB = Cursor.PointB;
-                    CursorOutline.PointC = Cursor.PointC;
-
-                    RenderStepped:Wait();
-                end;
-
-                InputService.MouseIconEnabled = State;
-
-                Cursor:Remove();
-                CursorOutline:Remove();
-            end);
-        end;
-        if Toggled then
-            Outer.Visible = true;
-        end;
-
-        for _, Desc in next, Outer:GetDescendants() do
-            local Properties = {};
-
-            if Desc:IsA('ImageLabel') then
-                table.insert(Properties, 'ImageTransparency');
-                table.insert(Properties, 'BackgroundTransparency');
-            elseif Desc:IsA('TextLabel') or Desc:IsA('TextBox') then
-                table.insert(Properties, 'TextTransparency');
-            elseif Desc:IsA('Frame') or Desc:IsA('ScrollingFrame') then
-                table.insert(Properties, 'BackgroundTransparency');
-            elseif Desc:IsA('UIStroke') then
-                table.insert(Properties, 'Transparency');
-            end;
-
-            local Cache = TransparencyCache[Desc];
-
-            if (not Cache) then
-                Cache = {};
-                TransparencyCache[Desc] = Cache;
-            end;
-
-            for _, Prop in next, Properties do
-                if not Cache[Prop] then
-                    Cache[Prop] = Desc[Prop];
-                end;
-
-                if Cache[Prop] == 1 then
-                    continue;
-                end;
-
-                TweenService:Create(Desc, TweenInfo.new(FadeTime, Enum.EasingStyle.Linear), { [Prop] = Toggled and Cache[Prop] or 1 }):Play();
-            end;
-        end;
-
-        task.wait(FadeTime);
-
-        Outer.Visible = Toggled;
-
-        Fading = false;
-    end
+    end;
+    Library.WindowOpen = NowOpen;
+    Fading = false;
 
     Library:GiveSignal(InputService.InputBegan:Connect(function(Input, Processed)
         if type(Library.ToggleKeybind) == 'table' and Library.ToggleKeybind.Type == 'KeyPicker' then
             if Input.UserInputType == Enum.UserInputType.Keyboard and Input.KeyCode.Name == Library.ToggleKeybind.Value then
                 task.spawn(Library.Toggle)
             end
-        elseif Input.KeyCode == Enum.KeyCode.RightControl or (Input.KeyCode == Enum.KeyCode.RightShift and (not Processed)) then
+        elseif Input.KeyCode == Enum.KeyCode.RightControl then
             task.spawn(Library.Toggle)
         end
     end))
