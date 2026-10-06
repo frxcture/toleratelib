@@ -11,7 +11,6 @@ local CoreGui = game:GetService('CoreGui');
 local Teams = game:GetService('Teams');
 local Players = game:GetService('Players');
 local RunService = game:GetService('RunService')
-local TweenService = game:GetService('TweenService');
 local RenderStepped = RunService.RenderStepped;
 local LocalPlayer = Players.LocalPlayer;
 local Mouse = LocalPlayer:GetMouse();
@@ -118,6 +117,8 @@ function Library:SafeCallback(f, ...)
 
         return Library:Notify(event:sub(i + 1), 3);
     end;
+
+    return;
 end;
 
 function Library:AttemptSave()
@@ -169,8 +170,8 @@ function Library:CreateLabel(Properties, IsHud)
     return Library:Create(_Instance, Properties);
 end;
 
-function Library:MakeDraggable(Instance, Cutoff, UseDragOutline)
-    Instance.Active = true;
+function Library:MakeDraggable(Target, Cutoff, UseDragOutline)
+    Target.Active = true;
 
     local Dragging = false;
     local DragOffset = Vector2.new(0, 0);
@@ -180,9 +181,9 @@ function Library:MakeDraggable(Instance, Cutoff, UseDragOutline)
     local function GetDragPosition(Input)
         return UDim2.new(
             0,
-            Input.Position.X - DragOffset.X + (Instance.Size.X.Offset * Instance.AnchorPoint.X),
+            Input.Position.X - DragOffset.X + (Target.Size.X.Offset * Target.AnchorPoint.X),
             0,
-            Input.Position.Y - DragOffset.Y + (Instance.Size.Y.Offset * Instance.AnchorPoint.Y)
+            Input.Position.Y - DragOffset.Y + (Target.Size.Y.Offset * Target.AnchorPoint.Y)
         );
     end;
     local function GetDragOutlineColor()
@@ -203,10 +204,10 @@ function Library:MakeDraggable(Instance, Cutoff, UseDragOutline)
 
         if not DragGhost then
             DragGhost = Library:Create('Frame', {
-                AnchorPoint = Instance.AnchorPoint;
+                AnchorPoint = Target.AnchorPoint;
                 BackgroundTransparency = 1;
                 BorderSizePixel = 0;
-                Size = Instance.Size;
+                Size = Target.Size;
                 Visible = false;
                 ZIndex = 9999;
                 Parent = ScreenGui;
@@ -220,18 +221,18 @@ function Library:MakeDraggable(Instance, Cutoff, UseDragOutline)
             });
         end;
 
-        DragGhost.AnchorPoint = Instance.AnchorPoint;
-        DragGhost.Size = Instance.Size;
-        DragGhost.Position = Instance.Position;
+        DragGhost.AnchorPoint = Target.AnchorPoint;
+        DragGhost.Size = Target.Size;
+        DragGhost.Position = Target.Position;
         DragStroke.Color = GetDragOutlineColor();
         DragGhost.Visible = true;
     end;
 
-    Instance.InputBegan:Connect(function(Input)
+    Target.InputBegan:Connect(function(Input)
         if Input.UserInputType == Enum.UserInputType.MouseButton1 then
             local ObjPos = Vector2.new(
-                Input.Position.X - Instance.AbsolutePosition.X,
-                Input.Position.Y - Instance.AbsolutePosition.Y
+                Input.Position.X - Target.AbsolutePosition.X,
+                Input.Position.Y - Target.AbsolutePosition.Y
             );
 
             if ObjPos.Y > (Cutoff or 40) then
@@ -250,7 +251,7 @@ function Library:MakeDraggable(Instance, Cutoff, UseDragOutline)
             EndConnection = Input.Changed:Connect(function()
                 if Input.UserInputState == Enum.UserInputState.End then
                     if UseDragOutline and DragGhost and DragGhost.Visible then
-                        Instance.Position = DragGhost.Position;
+                        Target.Position = DragGhost.Position;
                         DragGhost.Visible = false;
                     end;
 
@@ -277,7 +278,7 @@ function Library:MakeDraggable(Instance, Cutoff, UseDragOutline)
         if UseDragOutline and DragGhost then
             DragGhost.Position = NewPosition;
         else
-            Instance.Position = NewPosition;
+            Target.Position = NewPosition;
         end;
     end));
 end;
@@ -340,12 +341,12 @@ function Library:AddToolTip(InfoStr, HoverInstance)
     end)
 end
 
-function Library:OnHighlight(HighlightInstance, Instance, Properties, PropertiesDefault)
+function Library:OnHighlight(HighlightInstance, Target, Properties, PropertiesDefault)
     HighlightInstance.MouseEnter:Connect(function()
-        local Reg = Library.RegistryMap[Instance];
+        local Reg = Library.RegistryMap[Target];
 
         for Property, ColorIdx in next, Properties do
-            Instance[Property] = Library[ColorIdx] or ColorIdx;
+            Target[Property] = Library[ColorIdx] or ColorIdx;
 
             if Reg and Reg.Properties[Property] then
                 Reg.Properties[Property] = ColorIdx;
@@ -354,10 +355,10 @@ function Library:OnHighlight(HighlightInstance, Instance, Properties, Properties
     end)
 
     HighlightInstance.MouseLeave:Connect(function()
-        local Reg = Library.RegistryMap[Instance];
+        local Reg = Library.RegistryMap[Target];
 
         for Property, ColorIdx in next, PropertiesDefault do
-            Instance[Property] = Library[ColorIdx] or ColorIdx;
+            Target[Property] = Library[ColorIdx] or ColorIdx;
 
             if Reg and Reg.Properties[Property] then
                 Reg.Properties[Property] = ColorIdx;
@@ -376,6 +377,8 @@ function Library:MouseIsOverOpenedFrame()
             return true;
         end;
     end;
+
+    return false;
 end;
 
 function Library:IsMouseOverFrame(Frame)
@@ -386,6 +389,8 @@ function Library:IsMouseOverFrame(Frame)
 
         return true;
     end;
+
+    return false;
 end;
 
 function Library:UpdateDependencyBoxes()
@@ -409,24 +414,24 @@ function Library:GetDarkerColor(Color)
 end;
 Library.AccentColorDark = Library:GetDarkerColor(Library.AccentColor);
 
-function Library:AddToRegistry(Instance, Properties, IsHud)
+function Library:AddToRegistry(Target, Properties, IsHud)
     local Idx = #Library.Registry + 1;
     local Data = {
-        Instance = Instance;
+        Instance = Target;
         Properties = Properties;
         Idx = Idx;
     };
 
     table.insert(Library.Registry, Data);
-    Library.RegistryMap[Instance] = Data;
+    Library.RegistryMap[Target] = Data;
 
     if IsHud then
         table.insert(Library.HudRegistry, Data);
     end;
 end;
 
-function Library:RemoveFromRegistry(Instance)
-    local Data = Library.RegistryMap[Instance];
+function Library:RemoveFromRegistry(Target)
+    local Data = Library.RegistryMap[Target];
 
     if Data then
         for Idx = #Library.Registry, 1, -1 do
@@ -441,7 +446,7 @@ function Library:RemoveFromRegistry(Instance)
             end;
         end;
 
-        Library.RegistryMap[Instance] = nil;
+        Library.RegistryMap[Target] = nil;
     end;
 end;
 
@@ -492,9 +497,9 @@ function Library:OnUnload(Callback)
     Library.OnUnload = Callback
 end
 
-Library:GiveSignal(ScreenGui.DescendantRemoving:Connect(function(Instance)
-    if Library.RegistryMap[Instance] then
-        Library:RemoveFromRegistry(Instance);
+Library:GiveSignal(ScreenGui.DescendantRemoving:Connect(function(Removed)
+    if Library.RegistryMap[Removed] then
+        Library:RemoveFromRegistry(Removed);
     end;
 end))
 
@@ -618,7 +623,7 @@ do
             Parent = SatVibMap;
         });
 
-        local CursorInner = Library:Create('ImageLabel', {
+Library:Create('ImageLabel', {
             Size = UDim2.new(0, CursorOuter.Size.X.Offset - 2, 0, CursorOuter.Size.Y.Offset - 2);
             Position = UDim2.new(0, 1, 0, 1);
             BackgroundTransparency = 1;
@@ -748,7 +753,7 @@ do
             });
         end;
 
-        local DisplayLabel = Library:CreateLabel({
+Library:CreateLabel({
             Size = UDim2.new(1, 0, 0, 14);
             Position = UDim2.fromOffset(5, 5);
             TextXAlignment = Enum.TextXAlignment.Left;
@@ -872,6 +877,7 @@ do
                     return Library:Notify('You have not copied a color!', 2)
                 end
                 ColorPicker:SetValueRGB(Library.ColorClipboard)
+                return;
             end)
 
 
@@ -902,7 +908,7 @@ do
             table.insert(SequenceTable, ColorSequenceKeypoint.new(Hue, Color3.fromHSV(Hue, 1, 1)));
         end;
 
-        local HueSelectorGradient = Library:Create('UIGradient', {
+Library:Create('UIGradient', {
             Color = ColorSequence.new(SequenceTable);
             Rotation = 90;
             Parent = HueSelectorInner;
@@ -944,6 +950,8 @@ do
                 TransparencyBoxInner.BackgroundColor3 = ColorPicker.Value;
                 TransparencyCursor.Position = UDim2.new(1 - ColorPicker.Transparency, 0, 0, 0);
             end;
+
+            CheckerFrame.Visible = ColorPicker.Transparency > 0;
 
             CursorOuter.Position = UDim2.new(ColorPicker.Sat, 0, 1 - ColorPicker.Vib, 0);
             HueCursor.Position = UDim2.new(0, 0, ColorPicker.Hue, 0);
@@ -1098,7 +1106,6 @@ do
     function Funcs:AddKeyPicker(Idx, Info)
         local ParentObj = self;
         local ToggleLabel = self.TextLabel;
-        local Container = self.Container;
 
         assert(Info.Default, 'AddKeyPicker: Missing default value.');
 
@@ -1750,10 +1757,6 @@ do
         local Groupbox = self;
         local Container = self.Container
 
-        local Divider = {
-            Type = 'Divider',
-        }
-
         Groupbox:AddBlank(2);
         local DividerOuter = Library:Create('Frame', {
             BackgroundColor3 = Color3.new(0, 0, 0);
@@ -1799,7 +1802,7 @@ do
         local Groupbox = self;
         local Container = Groupbox.Container;
 
-        local InputLabel = Library:CreateLabel({
+Library:CreateLabel({
             Size = UDim2.new(1, 0, 0, 15);
             TextSize = 14;
             Text = string.lower(tostring(Info.Text));
@@ -1850,7 +1853,7 @@ do
             Parent = TextBoxInner;
         });
 
-        local Container = Library:Create('Frame', {
+        local TextContainer = Library:Create('Frame', {
             BackgroundTransparency = 1;
             ClipsDescendants = true;
 
@@ -1878,7 +1881,7 @@ do
             TextXAlignment = Enum.TextXAlignment.Left;
 
             ZIndex = 7;
-            Parent = Container;
+            Parent = TextContainer;
         });
 
         Library:ApplyTextStroke(Box);
@@ -1920,7 +1923,7 @@ do
 
         local function Update()
             local PADDING = 2
-            local reveal = Container.AbsoluteSize.X
+            local reveal = TextContainer.AbsoluteSize.X
 
             if not Box:IsFocused() or Box.TextBounds.X <= reveal - 2 * PADDING then
 
@@ -2351,7 +2354,7 @@ do
         return Slider;
     end;
 
-    function Funcs:AddDropdown(Idx, Info)
+    function Funcs:AddDropdown(Index, Info)
         if Info.SpecialType == 'Player' then
             Info.Values = GetPlayersString();
             Info.AllowNull = true;
@@ -2382,7 +2385,7 @@ do
         local RelativeOffset = 0;
 
         if not Info.Compact then
-            local DropdownLabel = Library:CreateLabel({
+Library:CreateLabel({
                 Size = UDim2.new(1, 0, 0, 10);
                 TextSize = 14;
                 Text = string.lower(tostring(Info.Text));
@@ -2791,11 +2794,11 @@ do
 
         if next(Defaults) then
             for i = 1, #Defaults do
-                local Index = Defaults[i]
+                local DefaultIdx = Defaults[i]
                 if Info.Multi then
-                    Dropdown.Value[Dropdown.Values[Index]] = true
+                    Dropdown.Value[Dropdown.Values[DefaultIdx]] = true
                 else
-                    Dropdown.Value = Dropdown.Values[Index];
+                    Dropdown.Value = Dropdown.Values[DefaultIdx];
                 end
 
                 if (not Info.Multi) then break end
@@ -2808,7 +2811,7 @@ do
         Groupbox:AddBlank(Info.BlankSize or 5);
         Groupbox:Resize();
 
-        Options[Idx] = Dropdown;
+        Options[Index] = Dropdown;
         Dropdown.Instance = DropdownOuter;
         Dropdown.ListOuter = ListOuter;
 
@@ -3015,7 +3018,7 @@ do
         BackgroundColor3 = 'AccentColor';
     }, true);
 
-    local KeybindLabel = Library:CreateLabel({
+Library:CreateLabel({
         Size = UDim2.new(1, 0, 0, 20);
         Position = UDim2.fromOffset(5, 2),
         TextXAlignment = Enum.TextXAlignment.Left,
@@ -3118,7 +3121,7 @@ function Library:Notify(Text, Time)
         end
     });
 
-    local NotifyLabel = Library:CreateLabel({
+Library:CreateLabel({
         Position = UDim2.new(0, 4, 0, 0);
         Size = UDim2.new(1, -4, 1, 0);
         Text = Text;
@@ -3303,7 +3306,7 @@ function Library:CreateWindow(...)
 
         TabButton.BorderSizePixel = 0;
 
-        local TabButtonCorner = Library:Create('UICorner', {
+Library:Create('UICorner', {
             CornerRadius = UDim.new(0, 1);
             Parent = TabButton;
         });
@@ -3319,7 +3322,7 @@ function Library:CreateWindow(...)
             Color = 'OutlineColor';
         });
 
-        local TabButtonLabel = Library:CreateLabel({
+Library:CreateLabel({
             Position = UDim2.new(0, 0, 0, 0);
             Size = UDim2.new(1, 0, 1, -1);
             Text = string.lower(tostring(Name));
@@ -3469,7 +3472,7 @@ function Library:CreateWindow(...)
                 BackgroundColor3 = 'AccentColor';
             });
 
-            local GroupboxLabel = Library:CreateLabel({
+Library:CreateLabel({
                 Size = UDim2.new(1, 0, 0, 18);
                 Position = UDim2.new(0, 4, 0, 2);
                 TextSize = 14;
@@ -3600,7 +3603,7 @@ function Library:CreateWindow(...)
                     BackgroundColor3 = 'MainColor';
                 });
 
-                local ButtonLabel = Library:CreateLabel({
+Library:CreateLabel({
                     Size = UDim2.new(1, 0, 1, 0);
                     TextSize = 14;
                     Text = string.lower(tostring(Name));
@@ -3749,10 +3752,7 @@ function Library:CreateWindow(...)
         Parent = ScreenGui;
     });
 
-local TransparencyCache = {};
 local Toggled = false;
-local Fading = false;
-local ToggleToken = 0;
 
 function Library:Toggle()
     Toggled = (not Toggled);
@@ -3772,7 +3772,6 @@ function Library:Toggle()
         end;
     end;
     Library.WindowOpen = NowOpen;
-    Fading = false;
 
     Library:GiveSignal(InputService.InputBegan:Connect(function(Input, Processed)
         if type(Library.ToggleKeybind) == 'table' and Library.ToggleKeybind.Type == 'KeyPicker' then
@@ -3785,6 +3784,7 @@ function Library:Toggle()
     end))
 
     if Config.AutoShow then task.spawn(Library.Toggle) end
+end;
 
     local tolerategrip = Library:Create('TextButton', {
         Name = 'tolerategrip';
