@@ -3772,6 +3772,12 @@ function Library:Toggle()
         end;
     end;
     Library.WindowOpen = NowOpen;
+    if NowOpen then
+        pcall(function()
+            InputService.MouseBehavior = Enum.MouseBehavior.Default;
+            InputService.MouseIconEnabled = true;
+        end)
+    end;
 
     Library:GiveSignal(InputService.InputBegan:Connect(function(Input, Processed)
         if type(Library.ToggleKeybind) == 'table' and Library.ToggleKeybind.Type == 'KeyPicker' then
