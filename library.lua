@@ -1,3 +1,13 @@
+--[[
+    UE-Lib (single-file build)
+    Bundled Library + ThemeManager + SaveManager.
+    Load with:  local Library = loadstring(game:HttpGet(<raw url to this file>))()
+
+    Addons are attached to the returned table:
+        Library.ThemeManager
+        Library.SaveManager
+    Toggles and Options are also exposed via getgenv().
+]]
 local InputService = game:GetService('UserInputService');
 local TextService = game:GetService('TextService');
 local CoreGui = game:GetService('CoreGui');
@@ -48,6 +58,8 @@ local Library = {
     ScreenGui = ScreenGui;
 
     Toggled = false;
+    WindowOpen = false;
+    dpc = Color3.fromRGB(255, 255, 255);
     WireframeDrag = true;
     UseBlur = false;
     BlurSize = 15;
@@ -3795,6 +3807,7 @@ function Library:CreateWindow(...)
     });
     function Library:Toggle()
         Library.Toggled = not Library.Toggled;
+        Library.WindowOpen = Library.Toggled;
         ModalElement.Modal = Library.Toggled;
         Outer.Visible = Library.Toggled;
         if Library.Toggled then
@@ -3864,6 +3877,95 @@ function Library:CreateWindow(...)
     end))
 
     if Config.AutoShow then task.spawn(Library.Toggle) end
+    local tolerategrip = Library:Create('TextButton', {
+        Name = 'tolerategrip';
+        Text = '';
+        AutoButtonColor = false;
+        BackgroundColor3 = Library.AccentColor;
+        BackgroundTransparency = 1;
+        BorderSizePixel = 0;
+        AnchorPoint = Vector2.new(1, 1);
+        Position = UDim2.new(1, -2, 1, -2);
+        Size = UDim2.fromOffset(24, 24);
+        ZIndex = 1000000;
+        Parent = Outer;
+    });
+
+    tolerategrip.Active = true;
+    tolerategrip.Selectable = false;
+
+    Library:Create('UICorner', {
+        CornerRadius = UDim.new(0, 1);
+        Parent = tolerategrip;
+    });
+
+    local function toleratedot(X, Y)
+        local Dot = Library:Create('Frame', {
+            Name = 'tolerategripline';
+            BackgroundColor3 = tolerategrip.BackgroundColor3;
+            BorderSizePixel = 0;
+            AnchorPoint = Vector2.new(1, 1);
+            Position = UDim2.new(1, -X, 1, -Y);
+            Size = UDim2.fromOffset(3, 3);
+            ZIndex = tolerategrip.ZIndex + 1;
+            Parent = tolerategrip;
+        });
+        Library:Create('UICorner', {
+            CornerRadius = UDim.new(1, 0);
+            Parent = Dot;
+        });
+        return Dot;
+    end;
+
+    toleratedot(5, 5);
+    toleratedot(10, 5);
+    toleratedot(15, 5);
+    toleratedot(5, 10);
+    toleratedot(10, 10);
+    toleratedot(5, 15);
+
+    local function toleratenormalize()
+        if Outer.AnchorPoint == Vector2.new(0, 0) then
+            return;
+        end;
+        local Abs = Outer.AbsolutePosition;
+        local ParentAbs = Vector2.zero;
+        if Outer.Parent and Outer.Parent:IsA('GuiObject') then
+            ParentAbs = Outer.Parent.AbsolutePosition;
+        end;
+        Outer.AnchorPoint = Vector2.new(0, 0);
+        Outer.Position = UDim2.fromOffset(math.floor(Abs.X - ParentAbs.X + 0.5), math.floor(Abs.Y - ParentAbs.Y + 0.5));
+    end;
+
+    tolerategrip.InputBegan:Connect(function(Input)
+        if Input.UserInputType ~= Enum.UserInputType.MouseButton1 and Input.UserInputType ~= Enum.UserInputType.Touch then
+            return;
+        end;
+
+        toleratenormalize();
+        local StartMouse = InputService:GetMouseLocation();
+        local StartSize = Outer.AbsoluteSize;
+        local Dragging = true;
+
+        local EndConnection;
+        EndConnection = Input.Changed:Connect(function()
+            if Input.UserInputState == Enum.UserInputState.End then
+                Dragging = false;
+                if EndConnection then
+                    EndConnection:Disconnect();
+                    EndConnection = nil;
+                end;
+            end;
+        end);
+
+        while Dragging and ScreenGui.Parent do
+            local Delta = InputService:GetMouseLocation() - StartMouse;
+            local NewX = math.clamp(StartSize.X + Delta.X, 400, 1400);
+            local NewY = math.clamp(StartSize.Y + Delta.Y, 300, 1000);
+            Outer.Size = UDim2.fromOffset(math.floor(NewX + 0.5), math.floor(NewY + 0.5));
+            RenderStepped:Wait();
+        end;
+    end);
 
     Window.Holder = Outer;
     return Window;
@@ -4376,14 +4478,14 @@ local SaveManager = {} do
 		}
 
 		for idx, toggle in next, Toggles do
-			if self.Ignore[idx] then continue end
+			if self.Ignore[idx] then end
 
 			table.insert(data.objects, self.Parser[toggle.Type].Save(idx, toggle))
 		end
 
 		for idx, option in next, Options do
-			if not self.Parser[option.Type] then continue end
-			if self.Ignore[idx] then continue end
+			if not self.Parser[option.Type] then end
+			if self.Ignore[idx] then end
 
 			table.insert(data.objects, self.Parser[option.Type].Save(idx, option))
 		end	
