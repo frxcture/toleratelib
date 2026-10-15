@@ -1,13 +1,4 @@
---[[
-    UE-Lib (single-file build)
-    Bundled Library + ThemeManager + SaveManager.
-    Load with:  local Library = loadstring(game:HttpGet(<raw url to this file>))()
 
-    Addons are attached to the returned table:
-        Library.ThemeManager
-        Library.SaveManager
-    Toggles and Options are also exposed via getgenv().
-]]
 local InputService = game:GetService('UserInputService');
 local TextService = game:GetService('TextService');
 local CoreGui = game:GetService('CoreGui');
