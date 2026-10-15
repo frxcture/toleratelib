@@ -1,3 +1,13 @@
+--[[
+    UE-Lib (single-file build)
+    Bundled Library + ThemeManager + SaveManager.
+    Load with:  local Library = loadstring(game:HttpGet(<raw url to this file>))()
+
+    Addons are attached to the returned table:
+        Library.ThemeManager
+        Library.SaveManager
+    Toggles and Options are also exposed via getgenv().
+]]
 local InputService = game:GetService('UserInputService');
 local TextService = game:GetService('TextService');
 local CoreGui = game:GetService('CoreGui');
@@ -1577,7 +1587,7 @@ do
     function Funcs:AddBlank(Size)
         local Groupbox = self;
         local Container = Groupbox.Container;
-        Library:Create('Frame', {
+        return Library:Create('Frame', {
             BackgroundTransparency = 1;
             Size = UDim2.new(1, 0, 0, Size);
             ZIndex = 1;
@@ -1606,6 +1616,7 @@ do
         })
 
         local Boxes = {}
+        local RowBlank
 
         for i = 1, ColumnsCount do
             local Box = { Type = 'Groupbox' }
@@ -1620,7 +1631,7 @@ do
             local BoxLayout = Library:Create('UIListLayout', {
                 FillDirection = Enum.FillDirection.Vertical,
                 SortOrder = Enum.SortOrder.LayoutOrder,
-                Padding = UDim.new(0, 4),
+                Padding = UDim.new(0, 0),
                 Parent = BoxContainer
             })
 
@@ -1638,6 +1649,11 @@ do
                     end
                 end
                 RowOuter.Size = UDim2.new(1, 0, 0, maxHeight)
+                local isVis = maxHeight > 0
+                RowOuter.Visible = isVis
+                if RowBlank then
+                    RowBlank.Visible = isVis
+                end
                 if Groupbox.Resize then
                     Groupbox:Resize()
                 end
@@ -1650,7 +1666,7 @@ do
             table.insert(Boxes, Box)
         end
 
-        Groupbox:AddBlank(1)
+        RowBlank = Groupbox:AddBlank(1)
         if Groupbox.Resize then Groupbox:Resize() end
 
         return unpack(Boxes)
@@ -2239,23 +2255,25 @@ do
 
         local Groupbox = self;
         local Container = Groupbox.Container;
+        local SliderLabel;
+        local TopBlank;
         if not Info.Compact then
-            Library:CreateLabel({
-                Size = UDim2.new(1, 0, 0, 10);
+            SliderLabel = Library:CreateLabel({
+                Size = UDim2.new(1, -4, 0, 14);
                 TextSize = Library.FontSize;
                 Text = Info.Text;
                 TextXAlignment = Enum.TextXAlignment.Left;
-                TextYAlignment = Enum.TextYAlignment.Bottom;
+                TextYAlignment = Enum.TextYAlignment.Center;
                 ZIndex = 5;
                 Parent = Container;
             });
-            Groupbox:AddBlank(3);
+            TopBlank = Groupbox:AddBlank(2);
         end
 
         local SliderOuter = Library:Create('Frame', {
             BackgroundColor3 = Color3.new(0, 0, 0);
             BorderColor3 = Color3.new(0, 0, 0);
-            Size = UDim2.new(1, -4, 0, 13);
+            Size = UDim2.new(1, -4, 0, 15);
             ZIndex = 5;
             Parent = Container;
         });
@@ -2266,6 +2284,7 @@ do
             BackgroundColor3 = Library.MainColor;
             BorderColor3 = Library.OutlineColor;
             BorderMode = Enum.BorderMode.Inset;
+            ClipsDescendants = true;
             Size = UDim2.new(1, 0, 1, 0);
             ZIndex = 6;
             Parent = SliderOuter;
@@ -2277,6 +2296,7 @@ do
         local Fill = Library:Create('Frame', {
             BackgroundColor3 = Library.AccentColor;
             BorderColor3 = Library.AccentColorDark;
+            BorderSizePixel = 0;
             Size = UDim2.new(0, 0, 1, 0);
             ZIndex = 7;
             Parent = SliderInner;
@@ -2327,11 +2347,28 @@ do
                 DisplayLabel.Text = ForceLowerCase(string.format('%s/%s', Slider.Value .. Suffix, Slider.Max .. Suffix));
             end
 
-            local X = math.ceil(Library:MapValue(Slider.Value, Slider.Min, Slider.Max, 0, Slider.MaxSize));
-            Fill.Size = UDim2.new(0, X, 1, 0);
+            local Width = SliderInner.AbsoluteSize.X;
+            if Width > 0 then
+                Slider.MaxSize = Width;
+            end;
 
-            HideBorderRight.Visible = not (X == Slider.MaxSize or X == 0);
+            local ratio = 0;
+            if Slider.Max > Slider.Min then
+                ratio = math.clamp((Slider.Value - Slider.Min) / (Slider.Max - Slider.Min), 0, 1);
+            end;
+
+            Fill.Size = UDim2.new(ratio, 0, 1, 0);
+
+            if HideBorderRight then
+                HideBorderRight.Visible = not (ratio >= 1 or ratio <= 0);
+            end;
         end;
+        SliderInner:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
+            if SliderInner.AbsoluteSize.X > 0 then
+                Slider.MaxSize = SliderInner.AbsoluteSize.X;
+            end;
+            Slider:Display();
+        end);
         function Slider:OnChanged(Func)
             Slider.Changed = Func;
             Func(Slider.Value);
@@ -2341,11 +2378,13 @@ do
                 return math.floor(Value);
             end;
 
-
             return tonumber(string.format('%.' .. Slider.Rounding .. 'f', Value))
         end;
         function Slider:GetValueFromXOffset(X)
-            return Round(Library:MapValue(X, 0, Slider.MaxSize, Slider.Min, Slider.Max));
+            local width = SliderInner.AbsoluteSize.X;
+            if width <= 0 then width = Slider.MaxSize or 100; end;
+            local ratio = math.clamp(X / width, 0, 1);
+            return Round(Slider.Min + (Slider.Max - Slider.Min) * ratio);
         end;
         function Slider:SetValue(Str)
             local Num = tonumber(Str);
@@ -2363,29 +2402,45 @@ do
         end;
         function Slider:SetVisible(Visible)
             SliderOuter.Visible = Visible;
+            if SliderLabel then
+                SliderLabel.Visible = Visible;
+            end;
+            if TopBlank then
+                TopBlank.Visible = Visible;
+            end;
+            if BottomBlank then
+                BottomBlank.Visible = Visible;
+            end;
             Groupbox:Resize();
         end;
         SliderInner.InputBegan:Connect(function(Input)
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) and not Library:MouseIsOverOpenedFrame() then
-                
                 local function UpdateSlider(PosX)
-                    local gPos = Fill.AbsolutePosition.X
-                    
-                    local Diff = PosX - gPos
-                    local nX = math.clamp(Diff, 0, Slider.MaxSize)
+                    local width = SliderInner.AbsoluteSize.X;
+                    if width <= 0 then
+                        width = SliderOuter.AbsoluteSize.X;
+                    end;
+                    if width <= 0 then
+                        width = Slider.MaxSize or 100;
+                    else
+                        Slider.MaxSize = width;
+                    end;
 
-                    local nValue = Slider:GetValueFromXOffset(nX);
+                    local startX = SliderInner.AbsolutePosition.X;
+                    local Diff = PosX - startX;
+                    local ratio = math.clamp(Diff / width, 0, 1);
+
+                    local nValue = Round(Slider.Min + (Slider.Max - Slider.Min) * ratio);
                     local OldValue = Slider.Value;
-    
-                    Slider.Value = nValue;
 
+                    Slider.Value = nValue;
                     Slider:Display();
 
                     if nValue ~= OldValue then
                         Library:SafeCallback(Slider.Callback, Slider.Value);
                         Library:SafeCallback(Slider.Changed, Slider.Value);
                     end;
-                end
+                end;
 
                 UpdateSlider(Input.Position.X)
 
@@ -2407,10 +2462,17 @@ do
         end);
 
         Slider:Display();
-        Groupbox:AddBlank(Info.BlankSize or 6);
+        local BottomBlank = Groupbox:AddBlank(Info.BlankSize or 6);
         Groupbox:Resize();
 
         Slider.Instance = SliderOuter;
+        Slider.SliderOuter = SliderOuter;
+        Slider.Label = SliderLabel;
+        Slider.LabelInstance = SliderLabel;
+        Slider.TextLabel = SliderLabel;
+        Slider.TopBlank = TopBlank;
+        Slider.BottomBlank = BottomBlank;
+        Slider.BlankInstance = BottomBlank;
         Options[Idx] = Slider;
 
         return Slider;
@@ -3919,7 +3981,9 @@ function Library:CreateWindow(...)
         toleratenormalize();
         local StartMouse = InputService:GetMouseLocation();
         local StartSize = Outer.AbsoluteSize;
+        local TargetSize = StartSize;
         local Dragging = true;
+        local Wireframe = nil;
 
         local EndConnection;
         EndConnection = Input.Changed:Connect(function()
@@ -3936,8 +4000,39 @@ function Library:CreateWindow(...)
             local Delta = InputService:GetMouseLocation() - StartMouse;
             local NewX = math.clamp(StartSize.X + Delta.X, 585, 1200);
             local NewY = math.clamp(StartSize.Y + Delta.Y, 710, 900);
-            Outer.Size = UDim2.fromOffset(math.floor(NewX + 0.5), math.floor(NewY + 0.5));
+            TargetSize = Vector2.new(math.floor(NewX + 0.5), math.floor(NewY + 0.5));
+
+            if Library.WireframeDrag then
+                if not Wireframe then
+                    Wireframe = Library:Create('Frame', {
+                        Name = 'ResizeWireframe';
+                        Size = Outer.Size;
+                        Position = Outer.Position;
+                        AnchorPoint = Outer.AnchorPoint;
+                        BackgroundTransparency = 1;
+                        Active = false;
+                        ZIndex = 100000;
+                        Parent = ScreenGui;
+                    });
+                    Library:Create('UIStroke', {
+                        Color = Color3.fromRGB(255, 255, 255);
+                        Thickness = 1;
+                        ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
+                        Parent = Wireframe;
+                    });
+                end;
+                Wireframe.Size = UDim2.fromOffset(TargetSize.X, TargetSize.Y);
+            else
+                Outer.Size = UDim2.fromOffset(TargetSize.X, TargetSize.Y);
+            end;
+
             RenderStepped:Wait();
+        end;
+
+        Outer.Size = UDim2.fromOffset(TargetSize.X, TargetSize.Y);
+        if Wireframe then
+            Wireframe:Destroy();
+            Wireframe = nil;
         end;
     end);
 
@@ -4108,7 +4203,7 @@ do
 local httpService = game:GetService('HttpService')
 local ThemeManager = {} do
 	ThemeManager.Folder = 'LinoriaLibSettings'
-
+	-- if not isfolder(ThemeManager.Folder) then makefolder(ThemeManager.Folder) end
 
 	ThemeManager.Library = nil
 	ThemeManager.BuiltInThemes = {
@@ -4129,7 +4224,7 @@ local ThemeManager = {} do
 
 		if not data then return end
 
-
+		-- custom themes are just regular dictionaries instead of an array with { index, dictionary }
 
 		local scheme = data[2]
 		for idx, col in next, customThemeData or scheme do
@@ -4144,7 +4239,7 @@ local ThemeManager = {} do
 	end
 
 	function ThemeManager:ThemeUpdate()
-
+		-- This allows us to force apply themes without loading the themes tab :)
 		local options = { "FontColor", "MainColor", "AccentColor", "BackgroundColor", "OutlineColor" }
 		for i, field in next, options do
 			if Options and Options[field] then
@@ -4286,7 +4381,7 @@ local ThemeManager = {} do
 		for i = 1, #list do
 			local file = list[i]
 			if file:sub(-5) == '.json' then
-
+				-- i hate this but it has to be done ...
 
 				local pos = file:find('.json', 1, true)
 				local char = file:sub(pos, pos)
@@ -4312,7 +4407,8 @@ local ThemeManager = {} do
 	function ThemeManager:BuildFolderTree()
 		local paths = {}
 
-
+		-- build the entire tree if a path is like some-hub/phantom-forces
+		-- makefolder builds the entire tree on Synapse X but not other exploits
 
 		local parts = self.Folder:split('/')
 		for idx = 1, #parts do
@@ -4485,7 +4581,7 @@ local SaveManager = {} do
 
 		for _, option in next, decoded.objects do
 			if self.Parser[option.type] then
-				task.spawn(function() self.Parser[option.type].Load(option.idx, option) end) 
+				task.spawn(function() self.Parser[option.type].Load(option.idx, option) end) -- task.spawn() so the config loading wont get stuck.
 			end
 		end
 
@@ -4494,8 +4590,8 @@ local SaveManager = {} do
 
 	function SaveManager:IgnoreThemeSettings()
 		self:SetIgnoreIndexes({ 
-			"BackgroundColor", "MainColor", "AccentColor", "OutlineColor", "FontColor",
-			"ThemeManager_ThemeList", 'ThemeManager_CustomThemeList', 'ThemeManager_CustomThemeName', 
+			"BackgroundColor", "MainColor", "AccentColor", "OutlineColor", "FontColor", -- themes
+			"ThemeManager_ThemeList", 'ThemeManager_CustomThemeList', 'ThemeManager_CustomThemeName', -- themes
 		})
 	end
 
@@ -4521,7 +4617,7 @@ local SaveManager = {} do
 		for i = 1, #list do
 			local file = list[i]
 			if file:sub(-5) == '.json' then
-
+				-- i hate this but it has to be done ...
 
 				local pos = file:find('.json', 1, true)
 				local start = pos
