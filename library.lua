@@ -1,13 +1,3 @@
---[[
-    UE-Lib (single-file build)
-    Bundled Library + ThemeManager + SaveManager.
-    Load with:  local Library = loadstring(game:HttpGet(<raw url to this file>))()
-
-    Addons are attached to the returned table:
-        Library.ThemeManager
-        Library.SaveManager
-    Toggles and Options are also exposed via getgenv().
-]]
 local InputService = game:GetService('UserInputService');
 local TextService = game:GetService('TextService');
 local CoreGui = game:GetService('CoreGui');
@@ -29,6 +19,13 @@ ScreenGui.Parent = CoreGui;
 
 local Toggles = {};
 local Options = {};
+
+local function ForceLowerCase(Value)
+    if type(Value) == 'string' then
+        return string.lower(Value);
+    end;
+    return Value;
+end;
 
 getgenv().Toggles = Toggles;
 getgenv().Options = Options;
@@ -192,6 +189,9 @@ function Library:Create(Class, Properties)
         _Instance = Instance.new(Class);
     end;
     for Property, Value in next, Properties do
+        if Property == 'Text' or Property == 'PlaceholderText' then
+            Value = ForceLowerCase(Value);
+        end;
         _Instance[Property] = Value;
     end;
 
@@ -313,8 +313,8 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow)
 end;
 
 function Library:MakeResizable(Instance, MinSize, MaxSize)
-    MinSize = MinSize or Vector2.new(400, 300)
-    MaxSize = MaxSize or Vector2.new(1400, 1000)
+    MinSize = MinSize or Vector2.new(585, 710)
+    MaxSize = MaxSize or Vector2.new(1200, 900)
 
     local Grip = Library:Create('TextButton', {
         Name = 'ResizeGrip',
@@ -1022,7 +1022,7 @@ do
             CursorOuter.Position = UDim2.new(ColorPicker.Sat, 0, 1 - ColorPicker.Vib, 0);
             HueCursor.Position = UDim2.new(0, 0, ColorPicker.Hue, 0);
 
-            HueBox.Text = '#' .. ColorPicker.Value:ToHex()
+            HueBox.Text = ForceLowerCase('#' .. ColorPicker.Value:ToHex())
             RgbBox.Text = table.concat({ math.floor(ColorPicker.Value.R * 255), math.floor(ColorPicker.Value.G * 255), math.floor(ColorPicker.Value.B * 255) }, ', ')
 
             Library:SafeCallback(ColorPicker.Callback, ColorPicker.Value);
@@ -1376,7 +1376,7 @@ do
             local State = KeyPicker:GetState();
 
             local displayKey = (KeyPicker.Value == 'None') and '...' or KeyPicker.Value
-            ContainerLabel.Text = string.format('[%s] %s (%s)', displayKey, Info.Text, KeyPicker.Mode);
+            ContainerLabel.Text = ForceLowerCase(string.format('[%s] %s (%s)', displayKey, Info.Text, KeyPicker.Mode));
             local kbMode = Library.KeybindMode or 'All'
             if kbMode == 'Active' then
                 KeybindEntry.Visible = State == true
@@ -1435,7 +1435,7 @@ do
 
         function KeyPicker:SetValue(Data)
             local Key, Mode = Data[1], Data[2];
-            DisplayLabel.Text = Key;
+                    DisplayLabel.Text = ForceLowerCase(Key);
             KeyPicker.Value = Key;
             ModeButtons[Mode]:Select();
             KeyPicker:Update();
@@ -1506,7 +1506,7 @@ do
                     Break = true;
                     Picking = false;
 
-                    DisplayLabel.Text = Key;
+            DisplayLabel.Text = ForceLowerCase(Key);
                     KeyPicker.Value = Key;
                     Library:SafeCallback(KeyPicker.ChangedCallback, Input.KeyCode or Input.UserInputType)
                     Library:SafeCallback(KeyPicker.Changed, Input.KeyCode or Input.UserInputType)
@@ -1687,6 +1687,7 @@ do
         Label.Container = Container;
         Label.Instance = TextLabel;
         function Label:SetText(Text)
+            Text = ForceLowerCase(Text)
             TextLabel.Text = Text
 
             if DoesWrap then
@@ -1813,7 +1814,7 @@ do
                     Library:AddToRegistry(Button.Label, { TextColor3 = 'AccentColor' })
 
                     Button.Label.TextColor3 = Library.AccentColor
-                    Button.Label.Text = 'Are you sure?'
+                    Button.Label.Text = ForceLowerCase('Are you sure?')
                     Button.Locked = true
 
                     local clicked = WaitForEvent(Button.Outer.InputBegan, 0.5, ValidateClick)
@@ -1822,7 +1823,7 @@ do
                     Library:AddToRegistry(Button.Label, { TextColor3 = 'FontColor' })
 
                     Button.Label.TextColor3 = Library.FontColor
-                    Button.Label.Text = Button.Text
+                    Button.Label.Text = ForceLowerCase(Button.Text)
                     task.defer(rawset, Button, 'Locked', false)
 
                     if clicked then
@@ -2026,7 +2027,7 @@ do
             end
 
             Textbox.Value = Text;
-            Box.Text = Text;
+            Box.Text = ForceLowerCase(Text);
 
             Library:SafeCallback(Textbox.Callback, Textbox.Value);
             Library:SafeCallback(Textbox.Changed, Textbox.Value);
@@ -2319,11 +2320,11 @@ do
         function Slider:Display()
             local Suffix = Info.Suffix or '';
             if Info.Compact then
-                DisplayLabel.Text = Info.Text .. ': ' .. Slider.Value .. Suffix
+                DisplayLabel.Text = ForceLowerCase(Info.Text .. ': ' .. Slider.Value .. Suffix)
             elseif Info.HideMax then
-                DisplayLabel.Text = string.format('%s', Slider.Value .. Suffix)
+                DisplayLabel.Text = ForceLowerCase(string.format('%s', Slider.Value .. Suffix))
             else
-                DisplayLabel.Text = string.format('%s/%s', Slider.Value .. Suffix, Slider.Max .. Suffix);
+                DisplayLabel.Text = ForceLowerCase(string.format('%s/%s', Slider.Value .. Suffix, Slider.Max .. Suffix));
             end
 
             local X = math.ceil(Library:MapValue(Slider.Value, Slider.Min, Slider.Max, 0, Slider.MaxSize));
@@ -2593,7 +2594,7 @@ do
                 Str = Dropdown.Value or '';
             end;
 
-            ItemList.Text = (Str == '' and '--' or Str);
+            ItemList.Text = ForceLowerCase(Str == '' and '--' or Str);
         end;
         function Dropdown:GetActiveValues()
             if Info.Multi then
@@ -3096,7 +3097,7 @@ function Library:SetWatermark(Text)
     Library.Watermark.Position = UDim2.new(0.5, 0, posY.Scale, posY.Offset)
     Library:SetWatermarkVisibility(true)
 
-    Library.WatermarkText.Text = Text;
+    Library.WatermarkText.Text = ForceLowerCase(Text);
 end;
 function Library:Notify(Text, Time)
     local cfg     = Library.NotifyConfig
@@ -3302,31 +3303,6 @@ function Library:CreateWindow(...)
         ZIndex = 1;
         Parent = Inner;
     });
-    local MapNameLabel = Library:CreateLabel({
-        AnchorPoint = Vector2.new(1, 0),
-        Position = UDim2.new(1, -7, 0, 0),
-        Size = UDim2.new(0, 0, 0, 25),
-        Text = 'Loading...',
-        TextColor3 = Library.AccentColor,
-        TextXAlignment = Enum.TextXAlignment.Right,
-        ZIndex = 1,
-        Parent = Inner;
-    });
-    Library:AddToRegistry(MapNameLabel, {
-        TextColor3 = 'AccentColor';
-    });
-    task.spawn(function()
-        local success, info = pcall(function()
-            return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
-        end)
-        if success and info and info.Name then
-            MapNameLabel.Text = info.Name
-        else
-            MapNameLabel.Text = game.Name or "Unknown Map"
-        end
-    end)
-
-
     local TabBarOuter = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
         BorderColor3 = Library.OutlineColor;
@@ -3400,7 +3376,7 @@ function Library:CreateWindow(...)
         BorderColor3 = 'OutlineColor';
     });
     function Window:SetWindowTitle(Title)
-        WindowLabel.Text = Title;
+        WindowLabel.Text = ForceLowerCase(Title);
     end;
     function Window:AddTab(Name)
         local Tab = {
@@ -3871,8 +3847,6 @@ function Library:CreateWindow(...)
             if Input.UserInputType == Enum.UserInputType.Keyboard and Input.KeyCode.Name == Library.ToggleKeybind then
                 task.spawn(Library.Toggle)
             end
-        elseif Input.KeyCode == Enum.KeyCode.RightControl or (Input.KeyCode == Enum.KeyCode.RightShift and (not Processed)) then
-            task.spawn(Library.Toggle)
         end
     end))
 
@@ -3960,8 +3934,8 @@ function Library:CreateWindow(...)
 
         while Dragging and ScreenGui.Parent do
             local Delta = InputService:GetMouseLocation() - StartMouse;
-            local NewX = math.clamp(StartSize.X + Delta.X, 400, 1400);
-            local NewY = math.clamp(StartSize.Y + Delta.Y, 300, 1000);
+            local NewX = math.clamp(StartSize.X + Delta.X, 585, 1200);
+            local NewY = math.clamp(StartSize.Y + Delta.Y, 710, 900);
             Outer.Size = UDim2.fromOffset(math.floor(NewX + 0.5), math.floor(NewY + 0.5));
             RenderStepped:Wait();
         end;
@@ -4116,7 +4090,7 @@ if InputService.TouchEnabled then
 
     BindMobileButtonAction(LockBtn, LockOuter, function()
         IsUnlocked = not IsUnlocked
-        LockBtn.Text = IsUnlocked and "Lock UI" or "Unlock UI"
+        LockBtn.Text = ForceLowerCase(IsUnlocked and "Lock UI" or "Unlock UI")
         LockBtn.TextColor3 = IsUnlocked
             and Library.AccentColor
             or  Color3.fromRGB(255, 255, 255)
@@ -4134,7 +4108,7 @@ do
 local httpService = game:GetService('HttpService')
 local ThemeManager = {} do
 	ThemeManager.Folder = 'LinoriaLibSettings'
-	-- if not isfolder(ThemeManager.Folder) then makefolder(ThemeManager.Folder) end
+
 
 	ThemeManager.Library = nil
 	ThemeManager.BuiltInThemes = {
@@ -4155,7 +4129,7 @@ local ThemeManager = {} do
 
 		if not data then return end
 
-		-- custom themes are just regular dictionaries instead of an array with { index, dictionary }
+
 
 		local scheme = data[2]
 		for idx, col in next, customThemeData or scheme do
@@ -4170,7 +4144,7 @@ local ThemeManager = {} do
 	end
 
 	function ThemeManager:ThemeUpdate()
-		-- This allows us to force apply themes without loading the themes tab :)
+
 		local options = { "FontColor", "MainColor", "AccentColor", "BackgroundColor", "OutlineColor" }
 		for i, field in next, options do
 			if Options and Options[field] then
@@ -4312,7 +4286,7 @@ local ThemeManager = {} do
 		for i = 1, #list do
 			local file = list[i]
 			if file:sub(-5) == '.json' then
-				-- i hate this but it has to be done ...
+
 
 				local pos = file:find('.json', 1, true)
 				local char = file:sub(pos, pos)
@@ -4338,8 +4312,7 @@ local ThemeManager = {} do
 	function ThemeManager:BuildFolderTree()
 		local paths = {}
 
-		-- build the entire tree if a path is like some-hub/phantom-forces
-		-- makefolder builds the entire tree on Synapse X but not other exploits
+
 
 		local parts = self.Folder:split('/')
 		for idx = 1, #parts do
@@ -4512,7 +4485,7 @@ local SaveManager = {} do
 
 		for _, option in next, decoded.objects do
 			if self.Parser[option.type] then
-				task.spawn(function() self.Parser[option.type].Load(option.idx, option) end) -- task.spawn() so the config loading wont get stuck.
+				task.spawn(function() self.Parser[option.type].Load(option.idx, option) end) 
 			end
 		end
 
@@ -4521,8 +4494,8 @@ local SaveManager = {} do
 
 	function SaveManager:IgnoreThemeSettings()
 		self:SetIgnoreIndexes({ 
-			"BackgroundColor", "MainColor", "AccentColor", "OutlineColor", "FontColor", -- themes
-			"ThemeManager_ThemeList", 'ThemeManager_CustomThemeList', 'ThemeManager_CustomThemeName', -- themes
+			"BackgroundColor", "MainColor", "AccentColor", "OutlineColor", "FontColor",
+			"ThemeManager_ThemeList", 'ThemeManager_CustomThemeList', 'ThemeManager_CustomThemeName', 
 		})
 	end
 
@@ -4548,7 +4521,7 @@ local SaveManager = {} do
 		for i = 1, #list do
 			local file = list[i]
 			if file:sub(-5) == '.json' then
-				-- i hate this but it has to be done ...
+
 
 				local pos = file:find('.json', 1, true)
 				local start = pos
