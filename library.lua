@@ -1,128 +1,96 @@
-		local out = {}
-		for i = 1, #list do
-			local file = list[i]
-			if file:sub(-5) == '.json' then
-				-- i hate this but it has to be done ...
-
-				local pos = file:find('.json', 1, true)
-				local start = pos
-
-				local char = file:sub(pos, pos)
-				while char ~= '/' and char ~= '\\' and char ~= '' do
-					pos = pos - 1
-					char = file:sub(pos, pos)
-				end
-
-				if char == '/' or char == '\\' then
-					table.insert(out, file:sub(pos + 1, start - 1))
-				end
-			end
-		end
-		
-		return out
-	end
-
-	function SaveManager:SetLibrary(library)
-		self.Library = library
-	end
-
-	function SaveManager:LoadAutoloadConfig()
-		if isfile(self.Folder .. '/settings/autoload.txt') then
-			local name = readfile(self.Folder .. '/settings/autoload.txt')
-
-			local success, err = self:Load(name)
-			if not success and not SILENT then
-				return self.Library:Notify('Failed to load autoload config: ' .. err)
-			end
-			if not SILENT then
-				self.Library:Notify(string.format('Auto loaded config %q', name))
-			end
-		end
-	end
 
 
-	function SaveManager:BuildConfigSection(tab)
-		assert(self.Library, 'Must set SaveManager.Library')
+local InputService = game:GetService('UserInputService');
+local TextService = game:GetService('TextService');
+local CoreGui = game:GetService('CoreGui');
+local Teams = game:GetService('Teams');
+local Players = game:GetService('Players');
+local RunService = game:GetService('RunService')
+local TweenService = game:GetService('TweenService');
+local Lighting = game:GetService('Lighting');
+local RenderStepped = RunService.RenderStepped;
+local LocalPlayer = Players.LocalPlayer;
+local Mouse = LocalPlayer:GetMouse();
 
-		local section = tab:AddRightGroupbox('Configuration')
+local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 
-		section:AddInput('SaveManager_ConfigName',    { Text = 'Config name' })
-		section:AddDropdown('SaveManager_ConfigList', { Text = 'Config list', Values = self:RefreshConfigList(), AllowNull = true })
+local ScreenGui = Instance.new('ScreenGui');
+ProtectGui(ScreenGui);
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global;
+ScreenGui.Parent = CoreGui;
 
-		section:AddDivider()
+local Toggles = {};
+local Options = {};
 
-		section:AddButton('Create config', function()
-			local name = Options.SaveManager_ConfigName.Value
+local function ForceLowerCase(Value)
+    if type(Value) == 'string' then
+        return string.lower(Value);
+    end;
+    return Value;
+end;
 
-			if name:gsub(' ', '') == '' then 
-				return self.Library:Notify('Invalid config name (empty)', 2)
-			end
+getgenv().Toggles = Toggles;
+getgenv().Options = Options;
 
-			local success, err = self:Save(name)
-			if not success then
-				return self.Library:Notify('Failed to save config: ' .. err)
-			end
+local Library = {
+    Registry = {};
+    RegistryMap = {};
 
-			self.Library:Notify(string.format('Created config %q', name))
+    HudRegistry = {};
 
-			Options.SaveManager_ConfigList:SetValues(self:RefreshConfigList())
-			Options.SaveManager_ConfigList:SetValue(nil)
-		end):AddButton('Load config', function()
-			local name = Options.SaveManager_ConfigList.Value
+    FontColor = Color3.fromRGB(235, 239, 246);
+    MainColor = Color3.fromRGB(15, 17, 22);
+    BackgroundColor = Color3.fromRGB(9, 11, 15);
+    AccentColor = Color3.fromRGB(70, 116, 174);
+    OutlineColor = Color3.fromRGB(39, 45, 55);
+    RiskColor = Color3.fromRGB(255, 50, 50),
 
-			local success, err = self:Load(name)
-			if not success then
-				return self.Library:Notify('Failed to load config: ' .. err)
-			end
+    Black = Color3.new(0, 0, 0);
 
-			self.Library:Notify(string.format('Loaded config %q', name))
-		end)
+    Font = Enum.Font.GothamRounded,
+    FontSize = 14,
 
-		section:AddButton('Overwrite config', function()
-			local name = Options.SaveManager_ConfigList.Value
+    OpenedFrames = {};
+    DependencyBoxes = {};
 
-			local success, err = self:Save(name)
-			if not success then
-				return self.Library:Notify('Failed to overwrite config: ' .. err)
-			end
+    Signals = {};
+    ScreenGui = ScreenGui;
 
-			self.Library:Notify(string.format('Overwrote config %q', name))
-		end)
+    Toggled = false;
+    WindowOpen = false;
+    dpc = Color3.fromRGB(255, 255, 255);
+    WireframeDrag = true;
+    UseBlur = false;
+    BlurSize = 15;
 
-		section:AddButton('Refresh list', function()
-			Options.SaveManager_ConfigList:SetValues(self:RefreshConfigList())
-			Options.SaveManager_ConfigList:SetValue(nil)
-		end)
+    KeybindMode = 'All';
 
-		section:AddButton('Set autoload', function()
-			local name = Options.SaveManager_ConfigList.Value
-			if (not name) then
-				return;
-			end;
-			writefile(self.Folder .. '/settings/autoload.txt', name)
-			SaveManager.AutoloadLabel:SetText('Current autoload config: ' .. name)
-			self.Library:Notify(string.format('Set %q to auto load', name))
-		end):AddButton('Remove autoload', function()
-			local name = Options.SaveManager_ConfigList.Value
-			if (isfile(self.Folder .. '/settings/autoload.txt')) then
-				delfile(self.Folder .. '/settings/autoload.txt');
-			end;
-			SaveManager.AutoloadLabel:SetText('Current autoload config: none')
-			self.Library:Notify("removed autoload");
-		end)
+    NotifyConfig = {
+        Alignment = 'Left';
+        BarSide   = 'Left';
+        PositionX = 0;
+        PositionY = 40;
+    };
+};
 
-		SaveManager.AutoloadLabel = section:AddLabel('Current autoload config: none', true)
+Library.KeyPickerList = {};
 
-		if isfile(self.Folder .. '/settings/autoload.txt') then
-			local name = readfile(self.Folder .. '/settings/autoload.txt')
-			SaveManager.AutoloadLabel:SetText('Current autoload config: ' .. name)
-		end
+Library.BlurEffect = Instance.new("BlurEffect")
+Library.BlurEffect.Name = "LinoriaBlur"
+Library.BlurEffect.Size = 0
+Library.BlurEffect.Enabled = false
+pcall(function() Library.BlurEffect.Parent = Lighting end)
 
-		SaveManager:SetIgnoreIndexes({ 'SaveManager_ConfigList', 'SaveManager_ConfigName' })
-	end
-
-	SaveManager:BuildFolderTree()
-end
-getgenv().SaveManager = SaveManager;
-
-Library.SaveManager = SaveManager
+function Library:UpdateBlur()
+    if Library.UseBlur then
+        if Library.Toggled then
+            Library.BlurEffect.Enabled = true
+            TweenService:Create(Library.BlurEffect, TweenInfo.new(0.2, Enum.EasingStyle.Linear), {Size = Library.BlurSize}):Play()
+        end
+    else
+        local tween = TweenService:Create(Library.BlurEffect, TweenInfo.new(0.2, Enum.EasingStyle.Linear), {Size = 0})
+        tween:Play()
+    
+        task.delay(0.2, function()
+            if not Library.UseBlur then
+                Library.BlurEffect.Enabled = false
