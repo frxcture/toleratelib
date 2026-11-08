@@ -1,5 +1,4 @@
 
-
 local InputService = game:GetService('UserInputService');
 local TextService = game:GetService('TextService');
 local CoreGui = game:GetService('CoreGui');
@@ -38,16 +37,16 @@ local Library = {
 
     HudRegistry = {};
 
-    FontColor = Color3.fromRGB(235, 239, 246);
-    MainColor = Color3.fromRGB(15, 17, 22);
-    BackgroundColor = Color3.fromRGB(9, 11, 15);
-    AccentColor = Color3.fromRGB(70, 116, 174);
-    OutlineColor = Color3.fromRGB(39, 45, 55);
+    FontColor = Color3.fromRGB(255, 255, 255);
+    MainColor = Color3.fromRGB(28, 28, 28);
+    BackgroundColor = Color3.fromRGB(20, 20, 20);
+    AccentColor = Color3.fromRGB(0, 85, 255);
+    OutlineColor = Color3.fromRGB(50, 50, 50);
     RiskColor = Color3.fromRGB(255, 50, 50),
 
     Black = Color3.new(0, 0, 0);
 
-    Font = Enum.Font.GothamMedium,
+    Font = Enum.Font.Code,
     FontSize = 14,
 
     OpenedFrames = {};
@@ -240,84 +239,80 @@ function Library:CreateLabel(Properties, IsHud)
 end;
 
 function Library:MakeDraggable(Instance, Cutoff, IsWindow)
-    if not Instance or not Instance:IsA("GuiObject") then
-        return
-    end
-
-    Instance.Active = true
-
-    local DragInput = nil
-    local DragStart = nil
-    local StartPosition = nil
-    local ChangedConnection = nil
-    local EndedConnection = nil
-
-    local function StopDragging()
-        DragInput = nil
-        DragStart = nil
-        StartPosition = nil
-
-        if ChangedConnection then
-            ChangedConnection:Disconnect()
-            ChangedConnection = nil
-        end
-
-        if EndedConnection then
-            EndedConnection:Disconnect()
-            EndedConnection = nil
-        end
-    end
-
+    Instance.Active = true;
     Instance.InputBegan:Connect(function(Input)
-        local InputType = Input.UserInputType
-        if InputType ~= Enum.UserInputType.MouseButton1
-            and InputType ~= Enum.UserInputType.Touch then
-            return
-        end
+        if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+            local StartPos = Instance.Position
+            local DragStart = Input.Position
 
-        local RelativeY = Input.Position.Y - Instance.AbsolutePosition.Y
-        if RelativeY > (Cutoff or Instance.AbsoluteSize.Y) then
-            return
-        end
-
-        StopDragging()
-
-        DragInput = Input
-        DragStart = Input.Position
-        StartPosition = Instance.Position
-
-        ChangedConnection = InputService.InputChanged:Connect(function(Change)
-            local IsMouseMove = InputType == Enum.UserInputType.MouseButton1
-                and Change.UserInputType == Enum.UserInputType.MouseMovement
-            local IsTouchMove = InputType == Enum.UserInputType.Touch
-                and Change.UserInputType == Enum.UserInputType.Touch
-
-            if IsMouseMove or IsTouchMove then
-                local Delta = Change.Position - DragStart
-                Instance.Position = UDim2.new(
-                    StartPosition.X.Scale,
-                    StartPosition.X.Offset + Delta.X,
-                    StartPosition.Y.Scale,
-                    StartPosition.Y.Offset + Delta.Y
-                )
+            if (DragStart.Y - Instance.AbsolutePosition.Y) > (Cutoff or 40) then
+                return
             end
-        end)
 
-        EndedConnection = InputService.InputEnded:Connect(function(EndInput)
-            if EndInput == DragInput
-                or (InputType == Enum.UserInputType.MouseButton1
-                    and EndInput.UserInputType == Enum.UserInputType.MouseButton1) then
-                StopDragging()
-            end
-        end)
+            local Dragging = true
+            local HasMoved = false
+            local Wireframe = nil
+            local ChangedConn, EndedConn
+
+            ChangedConn = InputService.InputChanged:Connect(function(Change)
+                if Change.UserInputType == Enum.UserInputType.MouseMovement or Change == Input then
+                    local Delta = Change.Position - DragStart
+                    
+                    if IsWindow and Library.WireframeDrag then
+                        if not HasMoved and Delta.Magnitude > 2 then
+                            HasMoved = true
+                            
+                            Wireframe = Library:Create("Frame", {
+                                Size = Instance.Size,
+                                Position = Instance.Position,
+                                AnchorPoint = Instance.AnchorPoint,
+                                BackgroundTransparency = 1,
+                                Active = false,
+                                ZIndex = 100000,
+                                Parent = ScreenGui
+                            })
+
+                            Library:Create("UIStroke", {
+                                Color = Color3.fromRGB(255, 255, 255),
+                                Thickness = 1,
+                                ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+                                Parent = Wireframe
+                            })
+                        end
+                        
+                        if HasMoved and Wireframe then
+                            Wireframe.Position = UDim2.new(
+                                StartPos.X.Scale, StartPos.X.Offset + Delta.X,
+                                StartPos.Y.Scale, StartPos.Y.Offset + Delta.Y
+                            )
+                        end
+                    else
+                        Instance.Position = UDim2.new(
+                            StartPos.X.Scale, StartPos.X.Offset + Delta.X,
+                            StartPos.Y.Scale, StartPos.Y.Offset + Delta.Y
+                        )
+                    end
+                end
+            end)
+
+            EndedConn = InputService.InputEnded:Connect(function(EndInput)
+                if EndInput == Input or EndInput.UserInputType == Enum.UserInputType.Touch then
+                    Dragging = false
+                    ChangedConn:Disconnect()
+                    EndedConn:Disconnect()
+                    
+                    if IsWindow and Library.WireframeDrag and HasMoved and Wireframe then
+                        Instance.Position = Wireframe.Position
+                        
+                        Wireframe:Destroy()
+                        Wireframe = nil
+                    end
+                end
+            end)
+        end
     end)
-
-    Library:GiveSignal(Instance.AncestryChanged:Connect(function(_, Parent)
-        if not Parent then
-            StopDragging()
-        end
-    end))
 end;
+
 function Library:MakeResizable(Instance, MinSize, MaxSize)
     MinSize = MinSize or Vector2.new(585, 710)
     MaxSize = MaxSize or Vector2.new(1200, 900)
@@ -339,7 +334,7 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
         Size = UDim2.fromOffset(16, 16),
         Position = UDim2.new(1, 0, 1, 0),
         AnchorPoint = Vector2.new(1, 1),
-        Text = '',
+        Text = 'â—¢',
         TextColor3 = Library.OutlineColor,
         TextSize = Library.FontSize + 2,
         ZIndex = 26,
@@ -3332,6 +3327,11 @@ function Library:CreateWindow(...)
         ZIndex = 1;
         Parent = ScreenGui;
     });
+    Library:MakeDraggable(Outer, 25, true);
+
+    if Config.Resizable then
+        Library:MakeResizable(Outer, Config.MinSize, Config.MaxSize)
+    end
 
     local Inner = Library:Create('Frame', {
         Name = "Inner",
@@ -3355,9 +3355,7 @@ function Library:CreateWindow(...)
         TextXAlignment = Enum.TextXAlignment.Center;
         ZIndex = 1;
         Parent = Inner;
-        Active = true;
     });
-    Library:MakeDraggable(WindowLabel, 25, false);
     local TabBarOuter = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
         BorderColor3 = Library.OutlineColor;
@@ -3590,7 +3588,7 @@ function Library:CreateWindow(...)
                 Position = UDim2.new(0, 4, 0, 2);
                 TextSize = Library.FontSize;
                 Text = Info.Name;
-                TextXAlignment = Enum.TextXAlignment.Center;
+                TextXAlignment = Enum.TextXAlignment.Left;
                 ZIndex = 5;
                 Parent = BoxInner;
             });
@@ -4110,7 +4108,7 @@ if InputService.TouchEnabled then
             Name                = name .. "Btn",
             BackgroundTransparency = 1,
             Size                = UDim2.new(1, 0, 1, 0),
-            Font                = Library.Font,
+            Font                = Enum.Font.Code,
             Text                = text,
             TextColor3          = Color3.fromRGB(255, 255, 255),
             TextSize            = Library.FontSize - 1,
@@ -4200,7 +4198,7 @@ local ThemeManager = {} do
 
 	ThemeManager.Library = nil
 	ThemeManager.BuiltInThemes = {
-		['Default'] 		= { 1, httpService:JSONDecode('{"FontColor":"ebeff6","MainColor":"0f1116","AccentColor":"4674ae","BackgroundColor":"090b0f","OutlineColor":"272d37"}') },
+		['Default'] 		= { 1, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"181818","AccentColor":"4777b6","BackgroundColor":"141414","OutlineColor":"1f1f1f"}') },
 		['Primordial'] 		= { 1, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"181818","AccentColor":"d7a6b0","BackgroundColor":"1f1f1f","OutlineColor":"2a2a2a"}') },
 		['BBot'] 			= { 2, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"1e1e1e","AccentColor":"7e48a3","BackgroundColor":"232323","OutlineColor":"141414"}') },
 		['Fatality']		= { 3, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"1e1842","AccentColor":"c50754","BackgroundColor":"191335","OutlineColor":"3c355d"}') },
