@@ -47,7 +47,7 @@ local Library = {
 
     Black = Color3.new(0, 0, 0);
 
-    Font = Enum.Font.GothamRounded,
+    Font = Enum.Font.GothamMedium,
     FontSize = 14,
 
     OpenedFrames = {};
