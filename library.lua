@@ -37,8 +37,7 @@ local Library = {
 
     HudRegistry = {};
 
-    -- Quiet, blue-black palette inspired by compact desktop control panels.
-    -- Keep these values as the defaults so every existing control inherits the look.
+
     FontColor = Color3.fromRGB(232, 238, 243);
     MainColor = Color3.fromRGB(25, 28, 31);
     BackgroundColor = Color3.fromRGB(15, 17, 19);
@@ -48,7 +47,6 @@ local Library = {
 
     Black = Color3.fromRGB(6, 7, 8);
 
-    -- Fredoka has soft, pillowy letterforms without needing an external font asset.
     Font = Enum.Font.FredokaOne,
     FontSize = 14,
 
@@ -3340,8 +3338,7 @@ function Library:CreateWindow(...)
     });
     Library:MakeDraggable(Outer, 25, true);
 
-    -- Resizing is handled by the themed corner handle created below. Keeping a
-    -- single hit target prevents the old invisible grip from competing with it.
+
 
     local Inner = Library:Create('Frame', {
         Name = "Inner",
@@ -3857,40 +3854,32 @@ function Library:CreateWindow(...)
                     return;
                 end
 
-                -- A soft blue pointer with a pale inner face reads clearly on the
-                -- dark UI, while still feeling lighter than a stock hard-edged cursor.
-                local CursorOutline = Drawing.new('Triangle');
-                CursorOutline.Thickness = 2;
-                CursorOutline.Filled = true;
-                CursorOutline.Color = Library.Black;
-                CursorOutline.Visible = true;
-
                 local Cursor = Drawing.new('Triangle');
                 Cursor.Thickness = 1;
                 Cursor.Filled = true;
                 Cursor.Visible = true;
+
+                local lastPos = nil;
 
                 while Library.Toggled and ScreenGui.Parent do
                     InputService.MouseIconEnabled = false;
 
                     local mPos = InputService:GetMouseLocation();
 
-                    local size = Library.CursorSize;
-                    Cursor.Color = Library.AccentColor;
-
-                    CursorOutline.PointA = Vector2.new(mPos.X - 1, mPos.Y - 1);
-                    CursorOutline.PointB = Vector2.new(mPos.X + size + 2, mPos.Y + 6);
-                    CursorOutline.PointC = Vector2.new(mPos.X + 6, mPos.Y + size + 2);
-                    Cursor.PointA = Vector2.new(mPos.X + 1, mPos.Y + 1);
-                    Cursor.PointB = Vector2.new(mPos.X + size, mPos.Y + 6);
-                    Cursor.PointC = Vector2.new(mPos.X + 6, mPos.Y + size);
+                    if mPos ~= lastPos then
+                        local size = Library.CursorSize;
+                        Cursor.Color = Library.AccentColor;
+                        Cursor.PointA = Vector2.new(mPos.X + 1, mPos.Y + 1);
+                        Cursor.PointB = Vector2.new(mPos.X + size, mPos.Y + 6);
+                        Cursor.PointC = Vector2.new(mPos.X + 6, mPos.Y + size);
+                        lastPos = mPos;
+                    end;
 
                     RenderStepped:Wait();
                 end;
 
                 InputService.MouseIconEnabled = State;
 
-                CursorOutline:Remove();
                 Cursor:Remove();
             end);
         end;
@@ -3907,135 +3896,6 @@ function Library:CreateWindow(...)
             Library.BlurEffect.Enabled = false
         end
     end
-
-    Library:GiveSignal(InputService.InputBegan:Connect(function(Input, Processed)
-        if type(Library.ToggleKeybind) == 'table' and Library.ToggleKeybind.Type == 'KeyPicker' then
-            if Input.UserInputType == Enum.UserInputType.Keyboard and Input.KeyCode.Name == Library.ToggleKeybind.Value then
-                task.spawn(Library.Toggle)
-            end
-        elseif type(Library.ToggleKeybind) == 'string' then
-            if Input.UserInputType == Enum.UserInputType.Keyboard and Input.KeyCode.Name == Library.ToggleKeybind then
-                task.spawn(Library.Toggle)
-            end
-        end
-    end))
-
-    if Config.AutoShow then task.spawn(Library.Toggle) end
-    -- The lower-right handle is deliberately a visible, rounded blue affordance.
-    -- It replaces the old six-dot grip and mirrors the small corner pull in the reference.
-    local tolerategrip = Library:Create('TextButton', {
-        Name = 'CloudResizeHandle';
-        Text = '';
-        AutoButtonColor = false;
-        BackgroundTransparency = 1;
-        BorderSizePixel = 0;
-        AnchorPoint = Vector2.new(1, 1);
-        Position = UDim2.new(1, 0, 1, 0);
-        Size = UDim2.fromOffset(28, 28);
-        ZIndex = 1000000;
-        Parent = Outer;
-    });
-
-    tolerategrip.Active = true;
-    tolerategrip.Selectable = false;
-    tolerategrip.ClipsDescendants = true;
-
-    local cornerVisual = Library:Create('Frame', {
-        BackgroundColor3 = Library.AccentColor;
-        BackgroundTransparency = Config.Resizable and 0.08 or 1;
-        BorderSizePixel = 0;
-        AnchorPoint = Vector2.new(0.5, 0.5);
-        Position = UDim2.new(1, 0, 1, 0);
-        Size = UDim2.fromOffset(44, 44);
-        ZIndex = tolerategrip.ZIndex;
-        Parent = tolerategrip;
-    });
-    Library:Create('UICorner', {
-        CornerRadius = UDim.new(1, 0);
-        Parent = cornerVisual;
-    });
-    Library:AddToRegistry(cornerVisual, { BackgroundColor3 = 'AccentColor' });
-
-    local function toleratenormalize()
-        if Outer.AnchorPoint == Vector2.new(0, 0) then
-            return;
-        end;
-        local Abs = Outer.AbsolutePosition;
-        local ParentAbs = Vector2.zero;
-        if Outer.Parent and Outer.Parent:IsA('GuiObject') then
-            ParentAbs = Outer.Parent.AbsolutePosition;
-        end;
-        Outer.AnchorPoint = Vector2.new(0, 0);
-        Outer.Position = UDim2.fromOffset(math.floor(Abs.X - ParentAbs.X + 0.5), math.floor(Abs.Y - ParentAbs.Y + 0.5));
-    end;
-
-    tolerategrip.InputBegan:Connect(function(Input)
-        if not Config.Resizable then
-            return;
-        end;
-        if Input.UserInputType ~= Enum.UserInputType.MouseButton1 and Input.UserInputType ~= Enum.UserInputType.Touch then
-            return;
-        end;
-
-        toleratenormalize();
-        local StartMouse = InputService:GetMouseLocation();
-        local StartSize = Outer.AbsoluteSize;
-        local TargetSize = StartSize;
-        local Dragging = true;
-        local Wireframe = nil;
-
-        local EndConnection;
-        EndConnection = Input.Changed:Connect(function()
-            if Input.UserInputState == Enum.UserInputState.End then
-                Dragging = false;
-                if EndConnection then
-                    EndConnection:Disconnect();
-                    EndConnection = nil;
-                end;
-            end;
-        end);
-
-        while Dragging and ScreenGui.Parent do
-            local Delta = InputService:GetMouseLocation() - StartMouse;
-            local MinSize = Config.MinSize or Vector2.new(420, 360);
-            local MaxSize = Config.MaxSize or Vector2.new(1200, 900);
-            local NewX = math.clamp(StartSize.X + Delta.X, MinSize.X, MaxSize.X);
-            local NewY = math.clamp(StartSize.Y + Delta.Y, MinSize.Y, MaxSize.Y);
-            TargetSize = Vector2.new(math.floor(NewX + 0.5), math.floor(NewY + 0.5));
-
-            if Library.WireframeDrag then
-                if not Wireframe then
-                    Wireframe = Library:Create('Frame', {
-                        Name = 'ResizeWireframe';
-                        Size = Outer.Size;
-                        Position = Outer.Position;
-                        AnchorPoint = Outer.AnchorPoint;
-                        BackgroundTransparency = 1;
-                        Active = false;
-                        ZIndex = 100000;
-                        Parent = ScreenGui;
-                    });
-                    Library:Create('UIStroke', {
-                        Color = Library.AccentColor;
-                        Thickness = 1;
-                        ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
-                        Parent = Wireframe;
-                    });
-                end;
-                Wireframe.Size = UDim2.fromOffset(TargetSize.X, TargetSize.Y);
-            else
-                Outer.Size = UDim2.fromOffset(TargetSize.X, TargetSize.Y);
-            end;
-
-            RenderStepped:Wait();
-        end;
-
-        Outer.Size = UDim2.fromOffset(TargetSize.X, TargetSize.Y);
-        if Wireframe then
-            Wireframe:Destroy();
-            Wireframe = nil;
-        end;
-    end);
 
     Window.Holder = Outer;
     return Window;
@@ -4204,7 +4064,6 @@ do
 local httpService = game:GetService('HttpService')
 local ThemeManager = {} do
 	ThemeManager.Folder = 'LinoriaLibSettings'
-	-- if not isfolder(ThemeManager.Folder) then makefolder(ThemeManager.Folder) end
 
 	ThemeManager.Library = nil
 	ThemeManager.BuiltInThemes = {
@@ -4225,7 +4084,6 @@ local ThemeManager = {} do
 
 		if not data then return end
 
-		-- custom themes are just regular dictionaries instead of an array with { index, dictionary }
 
 		local scheme = data[2]
 		for idx, col in next, customThemeData or scheme do
@@ -4240,7 +4098,7 @@ local ThemeManager = {} do
 	end
 
 	function ThemeManager:ThemeUpdate()
-		-- This allows us to force apply themes without loading the themes tab :)
+
 		local options = { "FontColor", "MainColor", "AccentColor", "BackgroundColor", "OutlineColor" }
 		for i, field in next, options do
 			if Options and Options[field] then
@@ -4382,7 +4240,7 @@ local ThemeManager = {} do
 		for i = 1, #list do
 			local file = list[i]
 			if file:sub(-5) == '.json' then
-				-- i hate this but it has to be done ...
+
 
 				local pos = file:find('.json', 1, true)
 				local char = file:sub(pos, pos)
@@ -4408,8 +4266,6 @@ local ThemeManager = {} do
 	function ThemeManager:BuildFolderTree()
 		local paths = {}
 
-		-- build the entire tree if a path is like some-hub/phantom-forces
-		-- makefolder builds the entire tree on Synapse X but not other exploits
 
 		local parts = self.Folder:split('/')
 		for idx = 1, #parts do
@@ -4582,8 +4438,7 @@ local SaveManager = {} do
 
 		for _, option in next, decoded.objects do
 			if self.Parser[option.type] then
-				task.spawn(function() self.Parser[option.type].Load(option.idx, option) end) -- task.spawn() so the config loading wont get stuck.
-			end
+				task.spawn(function() self.Parser[option.type].Load(option.idx, option) end) 
 		end
 
 		return true
@@ -4591,8 +4446,8 @@ local SaveManager = {} do
 
 	function SaveManager:IgnoreThemeSettings()
 		self:SetIgnoreIndexes({ 
-			"BackgroundColor", "MainColor", "AccentColor", "OutlineColor", "FontColor", -- themes
-			"ThemeManager_ThemeList", 'ThemeManager_CustomThemeList', 'ThemeManager_CustomThemeName', -- themes
+			"BackgroundColor", "MainColor", "AccentColor", "OutlineColor", "FontColor", 
+			"ThemeManager_ThemeList", 'ThemeManager_CustomThemeList', 'ThemeManager_CustomThemeName',
 		})
 	end
 
@@ -4618,7 +4473,7 @@ local SaveManager = {} do
 		for i = 1, #list do
 			local file = list[i]
 			if file:sub(-5) == '.json' then
-				-- i hate this but it has to be done ...
+
 
 				local pos = file:find('.json', 1, true)
 				local start = pos
@@ -4745,3 +4600,4 @@ Library.SaveManager = SaveManager
 end
 
 return Library
+end
