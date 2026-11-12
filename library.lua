@@ -37,17 +37,23 @@ local Library = {
 
     HudRegistry = {};
 
-    FontColor = Color3.fromRGB(255, 255, 255);
-    MainColor = Color3.fromRGB(28, 28, 28);
-    BackgroundColor = Color3.fromRGB(20, 20, 20);
-    AccentColor = Color3.fromRGB(0, 85, 255);
-    OutlineColor = Color3.fromRGB(50, 50, 50);
-    RiskColor = Color3.fromRGB(255, 50, 50),
+    -- Quiet, blue-black palette inspired by compact desktop control panels.
+    -- Keep these values as the defaults so every existing control inherits the look.
+    FontColor = Color3.fromRGB(232, 238, 243);
+    MainColor = Color3.fromRGB(25, 28, 31);
+    BackgroundColor = Color3.fromRGB(15, 17, 19);
+    AccentColor = Color3.fromRGB(79, 126, 177);
+    OutlineColor = Color3.fromRGB(52, 57, 63);
+    RiskColor = Color3.fromRGB(201, 84, 84),
 
-    Black = Color3.new(0, 0, 0);
+    Black = Color3.fromRGB(6, 7, 8);
 
-    Font = Enum.Font.Code,
+    -- Fredoka has soft, pillowy letterforms without needing an external font asset.
+    Font = Enum.Font.FredokaOne,
     FontSize = 14,
+
+    CloudCursorEnabled = true,
+    CursorSize = 17,
 
     OpenedFrames = {};
     DependencyBoxes = {};
@@ -273,7 +279,7 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow)
                             })
 
                             Library:Create("UIStroke", {
-                                Color = Color3.fromRGB(255, 255, 255),
+                                Color = Library.AccentColor,
                                 Thickness = 1,
                                 ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
                                 Parent = Wireframe
@@ -381,7 +387,7 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
                         Parent = ScreenGui,
                     })
                     Library:Create('UIStroke', {
-                        Color = Color3.fromRGB(255, 255, 255),
+                        Color = Library.AccentColor,
                         Thickness = 1,
                         ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
                         Parent = Wireframe,
@@ -522,6 +528,7 @@ function Library:MapValue(Value, MinA, MaxA, MinB, MaxB)
 end;
 
 function Library:GetTextBounds(Text, Font, Size, Resolution)
+    Text = ForceLowerCase(Text);
     local Bounds = TextService:GetTextSize(Text, Size, Font, Resolution or Vector2.new(1920, 1080))
     return Bounds.X, Bounds.Y
 end;
@@ -1665,6 +1672,8 @@ do
     function Funcs:AddLabel(Text, DoesWrap)
         local Label = {};
 
+        Text = ForceLowerCase(Text);
+
         local Groupbox = self;
         local Container = Groupbox.Container;
 
@@ -1719,12 +1728,12 @@ do
         local function ProcessButtonParams(Class, Obj, ...)
             local Props = select(1, ...)
             if type(Props) == 'table' then
-                Obj.Text = Props.Text
+                Obj.Text = ForceLowerCase(Props.Text)
                 Obj.Func = Props.Func
                 Obj.DoubleClick = Props.DoubleClick
                 Obj.Tooltip = Props.Tooltip
             else
-                Obj.Text = select(1, ...)
+                Obj.Text = ForceLowerCase(select(1, ...))
                 Obj.Func = select(2, ...)
             end
 
@@ -3143,6 +3152,7 @@ function Library:SetWatermarkVisibility(Bool)
 end;
 
 function Library:SetWatermark(Text)
+    Text = ForceLowerCase(Text);
     local X, Y = Library:GetTextBounds(Text, Library.Font, Library.FontSize);
     local posY = Library.Watermark.Position.Y
     Library.Watermark.AnchorPoint = Vector2.new(0.5, 0)
@@ -3153,6 +3163,7 @@ function Library:SetWatermark(Text)
     Library.WatermarkText.Text = ForceLowerCase(Text);
 end;
 function Library:Notify(Text, Time)
+    Text = ForceLowerCase(Text);
     local cfg     = Library.NotifyConfig
     local barSide = cfg.BarSide   or 'Left'    
     local align   = cfg.Alignment or 'Left'    
@@ -3329,9 +3340,8 @@ function Library:CreateWindow(...)
     });
     Library:MakeDraggable(Outer, 25, true);
 
-    if Config.Resizable then
-        Library:MakeResizable(Outer, Config.MinSize, Config.MaxSize)
-    end
+    -- Resizing is handled by the themed corner handle created below. Keeping a
+    -- single hit target prevents the old invisible grip from competing with it.
 
     local Inner = Library:Create('Frame', {
         Name = "Inner",
@@ -3843,38 +3853,55 @@ function Library:CreateWindow(...)
             task.spawn(function()
                 local State = InputService.MouseIconEnabled;
 
+                if not Library.CloudCursorEnabled or not Drawing then
+                    return;
+                end
+
+                -- A soft blue pointer with a pale inner face reads clearly on the
+                -- dark UI, while still feeling lighter than a stock hard-edged cursor.
+                local CursorOutline = Drawing.new('Triangle');
+                CursorOutline.Thickness = 2;
+                CursorOutline.Filled = true;
+                CursorOutline.Color = Library.Black;
+                CursorOutline.Visible = true;
+
                 local Cursor = Drawing.new('Triangle');
                 Cursor.Thickness = 1;
                 Cursor.Filled = true;
                 Cursor.Visible = true;
 
-                local CursorOutline = Drawing.new('Triangle');
-                CursorOutline.Thickness = 1;
-                CursorOutline.Filled = false;
-                CursorOutline.Color = Color3.new(0, 0, 0);
-                CursorOutline.Visible = true;
+                local CursorHighlight = Drawing.new('Triangle');
+                CursorHighlight.Thickness = 1;
+                CursorHighlight.Filled = true;
+                CursorHighlight.Color = Color3.fromRGB(221, 234, 246);
+                CursorHighlight.Visible = true;
 
                 while Library.Toggled and ScreenGui.Parent do
                     InputService.MouseIconEnabled = false;
 
                     local mPos = InputService:GetMouseLocation();
 
+                    local size = Library.CursorSize;
                     Cursor.Color = Library.AccentColor;
 
-                    Cursor.PointA = Vector2.new(mPos.X, mPos.Y);
-                    Cursor.PointB = Vector2.new(mPos.X + 16, mPos.Y + 6);
-                    Cursor.PointC = Vector2.new(mPos.X + 6, mPos.Y + 16);
-                    CursorOutline.PointA = Cursor.PointA;
-                    CursorOutline.PointB = Cursor.PointB;
-                    CursorOutline.PointC = Cursor.PointC;
+                    CursorOutline.PointA = Vector2.new(mPos.X - 1, mPos.Y - 1);
+                    CursorOutline.PointB = Vector2.new(mPos.X + size + 2, mPos.Y + 6);
+                    CursorOutline.PointC = Vector2.new(mPos.X + 6, mPos.Y + size + 2);
+                    Cursor.PointA = Vector2.new(mPos.X + 1, mPos.Y + 1);
+                    Cursor.PointB = Vector2.new(mPos.X + size, mPos.Y + 6);
+                    Cursor.PointC = Vector2.new(mPos.X + 6, mPos.Y + size);
+                    CursorHighlight.PointA = Vector2.new(mPos.X + 4, mPos.Y + 4);
+                    CursorHighlight.PointB = Vector2.new(mPos.X + 9, mPos.Y + 6);
+                    CursorHighlight.PointC = Vector2.new(mPos.X + 6, mPos.Y + 9);
 
                     RenderStepped:Wait();
                 end;
 
                 InputService.MouseIconEnabled = State;
 
-                Cursor:Remove();
                 CursorOutline:Remove();
+                Cursor:Remove();
+                CursorHighlight:Remove();
             end);
         end;
         if Library.UseBlur then
@@ -3904,52 +3931,40 @@ function Library:CreateWindow(...)
     end))
 
     if Config.AutoShow then task.spawn(Library.Toggle) end
+    -- The lower-right handle is deliberately a visible, rounded blue affordance.
+    -- It replaces the old six-dot grip and mirrors the small corner pull in the reference.
     local tolerategrip = Library:Create('TextButton', {
-        Name = 'tolerategrip';
+        Name = 'CloudResizeHandle';
         Text = '';
         AutoButtonColor = false;
-        BackgroundColor3 = Library.AccentColor;
         BackgroundTransparency = 1;
         BorderSizePixel = 0;
         AnchorPoint = Vector2.new(1, 1);
-        Position = UDim2.new(1, -2, 1, -2);
-        Size = UDim2.fromOffset(24, 24);
+        Position = UDim2.new(1, 0, 1, 0);
+        Size = UDim2.fromOffset(28, 28);
         ZIndex = 1000000;
         Parent = Outer;
     });
 
     tolerategrip.Active = true;
     tolerategrip.Selectable = false;
+    tolerategrip.ClipsDescendants = true;
 
-    Library:Create('UICorner', {
-        CornerRadius = UDim.new(0, 1);
+    local cornerVisual = Library:Create('Frame', {
+        BackgroundColor3 = Library.AccentColor;
+        BackgroundTransparency = Config.Resizable and 0.08 or 1;
+        BorderSizePixel = 0;
+        AnchorPoint = Vector2.new(0.5, 0.5);
+        Position = UDim2.new(1, 0, 1, 0);
+        Size = UDim2.fromOffset(44, 44);
+        ZIndex = tolerategrip.ZIndex;
         Parent = tolerategrip;
     });
-
-    local function toleratedot(X, Y)
-        local Dot = Library:Create('Frame', {
-            Name = 'tolerategripline';
-            BackgroundColor3 = tolerategrip.BackgroundColor3;
-            BorderSizePixel = 0;
-            AnchorPoint = Vector2.new(1, 1);
-            Position = UDim2.new(1, -X, 1, -Y);
-            Size = UDim2.fromOffset(3, 3);
-            ZIndex = tolerategrip.ZIndex + 1;
-            Parent = tolerategrip;
-        });
-        Library:Create('UICorner', {
-            CornerRadius = UDim.new(1, 0);
-            Parent = Dot;
-        });
-        return Dot;
-    end;
-
-    toleratedot(5, 5);
-    toleratedot(10, 5);
-    toleratedot(15, 5);
-    toleratedot(5, 10);
-    toleratedot(10, 10);
-    toleratedot(5, 15);
+    Library:Create('UICorner', {
+        CornerRadius = UDim.new(1, 0);
+        Parent = cornerVisual;
+    });
+    Library:AddToRegistry(cornerVisual, { BackgroundColor3 = 'AccentColor' });
 
     local function toleratenormalize()
         if Outer.AnchorPoint == Vector2.new(0, 0) then
@@ -3965,6 +3980,9 @@ function Library:CreateWindow(...)
     end;
 
     tolerategrip.InputBegan:Connect(function(Input)
+        if not Config.Resizable then
+            return;
+        end;
         if Input.UserInputType ~= Enum.UserInputType.MouseButton1 and Input.UserInputType ~= Enum.UserInputType.Touch then
             return;
         end;
@@ -3989,8 +4007,10 @@ function Library:CreateWindow(...)
 
         while Dragging and ScreenGui.Parent do
             local Delta = InputService:GetMouseLocation() - StartMouse;
-            local NewX = math.clamp(StartSize.X + Delta.X, 585, 1200);
-            local NewY = math.clamp(StartSize.Y + Delta.Y, 710, 900);
+            local MinSize = Config.MinSize or Vector2.new(420, 360);
+            local MaxSize = Config.MaxSize or Vector2.new(1200, 900);
+            local NewX = math.clamp(StartSize.X + Delta.X, MinSize.X, MaxSize.X);
+            local NewY = math.clamp(StartSize.Y + Delta.Y, MinSize.Y, MaxSize.Y);
             TargetSize = Vector2.new(math.floor(NewX + 0.5), math.floor(NewY + 0.5));
 
             if Library.WireframeDrag then
@@ -4006,7 +4026,7 @@ function Library:CreateWindow(...)
                         Parent = ScreenGui;
                     });
                     Library:Create('UIStroke', {
-                        Color = Color3.fromRGB(255, 255, 255);
+                        Color = Library.AccentColor;
                         Thickness = 1;
                         ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
                         Parent = Wireframe;
@@ -4108,7 +4128,7 @@ if InputService.TouchEnabled then
             Name                = name .. "Btn",
             BackgroundTransparency = 1,
             Size                = UDim2.new(1, 0, 1, 0),
-            Font                = Enum.Font.Code,
+            Font                = Library.Font,
             Text                = text,
             TextColor3          = Color3.fromRGB(255, 255, 255),
             TextSize            = Library.FontSize - 1,
@@ -4179,7 +4199,7 @@ if InputService.TouchEnabled then
         LockBtn.Text = ForceLowerCase(IsUnlocked and "Lock UI" or "Unlock UI")
         LockBtn.TextColor3 = IsUnlocked
             and Library.AccentColor
-            or  Color3.fromRGB(255, 255, 255)
+            or  Library.FontColor
     end)
 
     local _origUpdate = Library.UpdateColorsUsingRegistry
@@ -4198,7 +4218,7 @@ local ThemeManager = {} do
 
 	ThemeManager.Library = nil
 	ThemeManager.BuiltInThemes = {
-		['Default'] 		= { 1, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"181818","AccentColor":"4777b6","BackgroundColor":"141414","OutlineColor":"1f1f1f"}') },
+		['Default'] 		= { 1, httpService:JSONDecode('{"FontColor":"e8eef3","MainColor":"191c1f","AccentColor":"4f7eb1","BackgroundColor":"0f1113","OutlineColor":"34393f"}') },
 		['Primordial'] 		= { 1, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"181818","AccentColor":"d7a6b0","BackgroundColor":"1f1f1f","OutlineColor":"2a2a2a"}') },
 		['BBot'] 			= { 2, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"1e1e1e","AccentColor":"7e48a3","BackgroundColor":"232323","OutlineColor":"141414"}') },
 		['Fatality']		= { 3, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"1e1842","AccentColor":"c50754","BackgroundColor":"191335","OutlineColor":"3c355d"}') },
