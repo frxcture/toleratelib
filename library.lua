@@ -3870,12 +3870,6 @@ function Library:CreateWindow(...)
                 Cursor.Filled = true;
                 Cursor.Visible = true;
 
-                local CursorHighlight = Drawing.new('Triangle');
-                CursorHighlight.Thickness = 1;
-                CursorHighlight.Filled = true;
-                CursorHighlight.Color = Color3.fromRGB(221, 234, 246);
-                CursorHighlight.Visible = true;
-
                 while Library.Toggled and ScreenGui.Parent do
                     InputService.MouseIconEnabled = false;
 
@@ -3890,9 +3884,6 @@ function Library:CreateWindow(...)
                     Cursor.PointA = Vector2.new(mPos.X + 1, mPos.Y + 1);
                     Cursor.PointB = Vector2.new(mPos.X + size, mPos.Y + 6);
                     Cursor.PointC = Vector2.new(mPos.X + 6, mPos.Y + size);
-                    CursorHighlight.PointA = Vector2.new(mPos.X + 4, mPos.Y + 4);
-                    CursorHighlight.PointB = Vector2.new(mPos.X + 9, mPos.Y + 6);
-                    CursorHighlight.PointC = Vector2.new(mPos.X + 6, mPos.Y + 9);
 
                     RenderStepped:Wait();
                 end;
@@ -3901,7 +3892,6 @@ function Library:CreateWindow(...)
 
                 CursorOutline:Remove();
                 Cursor:Remove();
-                CursorHighlight:Remove();
             end);
         end;
         if Library.UseBlur then
