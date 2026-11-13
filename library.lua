@@ -317,7 +317,15 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow)
 end;
 
 function Library:MakeResizable(Instance, MinSize, MaxSize)
-    MinSize = MinSize or Vector2.new(350, 250)
+    local defaultSize = Vector2.new(Instance.Size.X.Offset, Instance.Size.Y.Offset)
+    if defaultSize.X <= 0 or defaultSize.Y <= 0 then
+        defaultSize = Vector2.new(Instance.AbsoluteSize.X, Instance.AbsoluteSize.Y)
+    end
+    if defaultSize.X <= 0 or defaultSize.Y <= 0 then
+        defaultSize = Vector2.new(550, 600)
+    end
+
+    MinSize = MinSize or defaultSize
     MaxSize = MaxSize or Vector2.new(1600, 1200)
 
     local GripSize = 24
@@ -3383,7 +3391,8 @@ function Library:CreateWindow(...)
     Library:MakeDraggable(Outer, 25, true);
 
     if Config.Resizable ~= false then
-        local MinSize = Config.MinSize or Vector2.new(350, 250)
+        local defaultSize = Vector2.new(Config.Size.X.Offset, Config.Size.Y.Offset)
+        local MinSize = Config.MinSize or defaultSize
         local MaxSize = Config.MaxSize or Vector2.new(1600, 1200)
         Window.ResizeGrip = Library:MakeResizable(Outer, MinSize, MaxSize)
     end
