@@ -2159,6 +2159,13 @@ do
         Groupbox:Resize();
     end
 
+    function Funcs:AddColorPicker(Idx, Info)
+        Info = Info or {};
+        local Text = Info.Text or Info.Title or Idx;
+        local Label = self:AddLabel(Text);
+        return Label:AddColorPicker(Idx, Info);
+    end;
+
     function Funcs:AddInput(Idx, Info)
         assert(Info.Text, 'AddInput: Missing `Text` string.')
 
