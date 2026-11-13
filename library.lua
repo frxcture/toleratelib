@@ -4089,6 +4089,12 @@ function Library:CreateWindow(...)
         Library.WindowOpen = Library.Toggled;
         ModalElement.Modal = Library.Toggled;
         Outer.Visible = Library.Toggled;
+        if not Library.Toggled then
+            for Frame, _ in next, Library.OpenedFrames do
+                Frame.Visible = false;
+            end
+            table.clear(Library.OpenedFrames);
+        end
         if Library.Toggled then
             task.spawn(function()
                 local State = InputService.MouseIconEnabled;
@@ -4809,7 +4815,7 @@ local SaveManager = {} do
 			self.Library:Notify(string.format('Loaded config %q', name))
 		end)
 
-		section:AddButton('Overwrite config', function()
+		section:AddButton({ Text = 'Overwrite config', DoubleClick = true, Func = function()
 			local name = Options.SaveManager_ConfigList.Value
 
 			local success, err = self:Save(name)
@@ -4818,7 +4824,7 @@ local SaveManager = {} do
 			end
 
 			self.Library:Notify(string.format('Overwrote config %q', name))
-		end)
+		end })
 
 		section:AddButton('Refresh list', function()
 			Options.SaveManager_ConfigList:SetValues(self:RefreshConfigList())
@@ -4834,12 +4840,13 @@ local SaveManager = {} do
 			SaveManager.AutoloadLabel:SetText('Current autoload config: ' .. name)
 			self.Library:Notify(string.format('Set %q to auto load', name))
 		end):AddButton('Remove autoload', function()
-			local name = Options.SaveManager_ConfigList.Value
 			if (isfile(self.Folder .. '/settings/autoload.txt')) then
 				delfile(self.Folder .. '/settings/autoload.txt');
-			end;
-			SaveManager.AutoloadLabel:SetText('Current autoload config: none')
-			self.Library:Notify("removed autoload");
+				SaveManager.AutoloadLabel:SetText('Current autoload config: none')
+				self.Library:Notify("removed autoload");
+			else
+				self.Library:Notify("no autoload config set");
+			end
 		end)
 
 		SaveManager.AutoloadLabel = section:AddLabel('Current autoload config: none', true)
