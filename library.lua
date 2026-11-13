@@ -317,35 +317,59 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow)
 end;
 
 function Library:MakeResizable(Instance, MinSize, MaxSize)
-    MinSize = MinSize or Vector2.new(585, 710)
-    MaxSize = MaxSize or Vector2.new(1200, 900)
+    MinSize = MinSize or Vector2.new(350, 250)
+    MaxSize = MaxSize or Vector2.new(1600, 1200)
+
+    local GripSize = 24
 
     local Grip = Library:Create('TextButton', {
         Name = 'ResizeGrip',
         Text = '',
         AutoButtonColor = false,
         BackgroundTransparency = 1,
-        Size = UDim2.fromOffset(16, 16),
-        Position = UDim2.new(1, -4, 1, -4),
+        BorderSizePixel = 0,
+        ClipsDescendants = true,
+        Size = UDim2.fromOffset(GripSize, GripSize),
+        Position = UDim2.new(1, 0, 1, 0),
         AnchorPoint = Vector2.new(1, 1),
-        ZIndex = 25,
+        ZIndex = 50,
+        Active = true,
         Parent = Instance,
     })
 
-    local GripIcon = Library:CreateLabel({
-        BackgroundTransparency = 1,
-        Size = UDim2.fromOffset(16, 16),
-        Position = UDim2.new(1, 0, 1, 0),
-        AnchorPoint = Vector2.new(1, 1),
-        Text = 'â—¢',
-        TextColor3 = Library.OutlineColor,
-        TextSize = Library.FontSize + 2,
-        ZIndex = 26,
+    local GripSector = Library:Create('Frame', {
+        Name = 'GripSector',
+        BackgroundColor3 = Library.AccentColor,
+        BackgroundTransparency = 0.3,
+        BorderSizePixel = 0,
+        Size = UDim2.fromOffset(GripSize * 2, GripSize * 2),
+        Position = UDim2.fromOffset(GripSize, GripSize),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        ZIndex = 51,
+        Active = false,
         Parent = Grip,
     })
-    Library:AddToRegistry(GripIcon, {
-        TextColor3 = 'OutlineColor',
+
+    Library:Create('UICorner', {
+        CornerRadius = UDim.new(1, 0),
+        Parent = GripSector,
     })
+
+    Library:AddToRegistry(GripSector, {
+        BackgroundColor3 = 'AccentColor',
+    })
+
+    local isResizing = false
+
+    Grip.MouseEnter:Connect(function()
+        GripSector.BackgroundTransparency = 0.15
+    end)
+
+    Grip.MouseLeave:Connect(function()
+        if not isResizing then
+            GripSector.BackgroundTransparency = 0.3
+        end
+    end)
 
     Grip.InputBegan:Connect(function(Input)
         if Input.UserInputType ~= Enum.UserInputType.MouseButton1
@@ -353,8 +377,19 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
             return
         end
 
-        local StartSize = Instance.Size
-        local DragStart = Input.Position
+        isResizing = true
+        GripSector.BackgroundTransparency = 0.1
+
+        local startSize = Instance.AbsoluteSize
+        local startPos  = Instance.AbsolutePosition
+        local dragStart = Input.Position
+
+        -- Fix anchor point so only bottom-right expands/shrinks while top-left stays pinned
+        if Instance.AnchorPoint ~= Vector2.new(0, 0) then
+            Instance.AnchorPoint = Vector2.new(0, 0)
+            Instance.Position = UDim2.fromOffset(startPos.X, startPos.Y)
+        end
+
         local HasMoved = false
         local Wireframe = nil
         local ChangedConn, EndedConn
@@ -364,25 +399,27 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
                 return
             end
 
-            local Delta = Change.Position - DragStart
-            if Delta.Magnitude <= 2 then return end
+            local Delta = Change.Position - dragStart
+            if not HasMoved and Delta.Magnitude <= 2 then return end
             HasMoved = true
 
-            local newW = math.clamp(StartSize.X.Offset + Delta.X, MinSize.X, MaxSize.X)
-            local newH = math.clamp(StartSize.Y.Offset + Delta.Y, MinSize.Y, MaxSize.Y)
+            local newW = math.clamp(startSize.X + Delta.X, MinSize.X, MaxSize.X)
+            local newH = math.clamp(startSize.Y + Delta.Y, MinSize.Y, MaxSize.Y)
             local newSize = UDim2.fromOffset(newW, newH)
 
             if Library.WireframeDrag then
                 if not Wireframe then
                     Wireframe = Library:Create('Frame', {
-                        Size = Instance.Size,
-                        Position = Instance.Position,
-                        AnchorPoint = Instance.AnchorPoint,
+                        Name = 'ResizeWireframe',
+                        Size = UDim2.fromOffset(startSize.X, startSize.Y),
+                        Position = UDim2.fromOffset(startPos.X, startPos.Y),
+                        AnchorPoint = Vector2.new(0, 0),
                         BackgroundTransparency = 1,
                         Active = false,
                         ZIndex = 100000,
                         Parent = ScreenGui,
                     })
+
                     Library:Create('UIStroke', {
                         Color = Library.AccentColor,
                         Thickness = 1,
@@ -390,27 +427,35 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
                         Parent = Wireframe,
                     })
                 end
+
                 Wireframe.Size = newSize
-                Wireframe.Position = Instance.Position
             else
                 Instance.Size = newSize
             end
         end)
 
         EndedConn = InputService.InputEnded:Connect(function(EndInput)
-            if EndInput ~= Input and EndInput.UserInputType ~= Enum.UserInputType.Touch then
+            if EndInput ~= Input
+                and EndInput.UserInputType ~= Enum.UserInputType.Touch
+                and EndInput.UserInputType ~= Enum.UserInputType.MouseButton1 then
                 return
             end
 
             ChangedConn:Disconnect()
             EndedConn:Disconnect()
+            isResizing = false
+            GripSector.BackgroundTransparency = 0.3
 
-            if Library.WireframeDrag and HasMoved and Wireframe then
-                Instance.Size = Wireframe.Size
+            if Library.WireframeDrag and Wireframe then
+                if HasMoved then
+                    Instance.Size = Wireframe.Size
+                end
                 Wireframe:Destroy()
             end
         end)
     end)
+
+    return Grip
 end;
 
 function Library:AddToolTip(InfoStr, HoverInstance)
@@ -3337,6 +3382,12 @@ function Library:CreateWindow(...)
     });
     Library:MakeDraggable(Outer, 25, true);
 
+    if Config.Resizable ~= false then
+        local MinSize = Config.MinSize or Vector2.new(350, 250)
+        local MaxSize = Config.MaxSize or Vector2.new(1600, 1200)
+        Window.ResizeGrip = Library:MakeResizable(Outer, MinSize, MaxSize)
+    end
+
 
 
     local Inner = Library:Create('Frame', {
@@ -4616,4 +4667,3 @@ Library.SaveManager = SaveManager
 end
 
 return Library
-end
