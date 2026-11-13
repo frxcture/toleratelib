@@ -469,6 +469,172 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
     return Grip
 end;
 
+function Library:Create3DLogo(Config)
+    Config = Config or {}
+    local Outer = Config.Outer
+    local Asset = Config.Asset or ''
+    local Color = Config.Color or Library.AccentColor
+    local Size = Config.Size or 340
+    local Speed = Config.Speed or 40
+    local Enabled = Config.Enabled ~= false
+
+    local Viewport = Library:Create('ViewportFrame', {
+        Name = 'Background3DLogo',
+        Size = UDim2.fromOffset(Size, Size),
+        Position = Config.Position or UDim2.fromScale(0.5, 0.5),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ZIndex = 0,
+        Active = false,
+        Visible = false,
+        Parent = ScreenGui,
+    })
+
+    local Camera = Instance.new('Camera')
+    Camera.FieldOfView = 45
+    Camera.CFrame = CFrame.new(Vector3.new(0, 0, 6.5), Vector3.new(0, 0, 0))
+    Camera.Parent = Viewport
+    Viewport.CurrentCamera = Camera
+
+    Viewport.Ambient = Color3.fromRGB(160, 160, 160)
+    Viewport.LightColor = Color3.fromRGB(255, 255, 255)
+    Viewport.LightDirection = Vector3.new(-1, 1.2, 1).Unit
+
+    local LogoModel = Instance.new('Model')
+    LogoModel.Name = 'SpinningLogoModel'
+    LogoModel.Parent = Viewport
+
+    local SLICE_COUNT = 9
+    local DEPTH = 0.28
+    local Slices = {}
+    local Decals = {}
+
+    local function buildSlices(textureAsset, sliceColor)
+        for _, obj in ipairs(LogoModel:GetChildren()) do
+            obj:Destroy()
+        end
+        table.clear(Slices)
+        table.clear(Decals)
+
+        if not textureAsset or textureAsset == '' then return end
+
+        for i = 1, SLICE_COUNT do
+            local frac = (i - 1) / (SLICE_COUNT - 1)
+            local zOffset = -DEPTH / 2 + frac * DEPTH
+
+            local slice = Instance.new('Part')
+            slice.Name = 'Slice_' .. i
+            slice.Size = Vector3.new(2.8, 3.0, 0.01)
+            slice.Transparency = 1
+            slice.CanCollide = false
+            slice.Anchored = true
+            slice.CastShadow = false
+            slice.Parent = LogoModel
+
+            local decalFront = Instance.new('Decal')
+            decalFront.Face = Enum.NormalId.Front
+            decalFront.Texture = textureAsset
+            decalFront.Color3 = sliceColor
+            decalFront.Parent = slice
+            table.insert(Decals, decalFront)
+
+            local decalBack = Instance.new('Decal')
+            decalBack.Face = Enum.NormalId.Back
+            decalBack.Texture = textureAsset
+            decalBack.Color3 = sliceColor
+            decalBack.Parent = slice
+            table.insert(Decals, decalBack)
+
+            table.insert(Slices, { Part = slice, Z = zOffset })
+        end
+    end
+
+    if Asset and Asset ~= '' then
+        buildSlices(Asset, Color)
+    end
+
+    local angle = 0
+    local tiltX = math.rad(12)
+    local tiltZ = math.rad(-6)
+    local RenderConn
+
+    local function startSpin()
+        if RenderConn then return end
+        RenderConn = RunService.RenderStepped:Connect(function(dt)
+            if not Viewport.Visible then return end
+            angle = (angle + Speed * dt) % 360
+            local baseCF = CFrame.Angles(tiltX, math.rad(angle), tiltZ)
+            for _, item in ipairs(Slices) do
+                if item.Part and item.Part.Parent then
+                    item.Part.CFrame = baseCF * CFrame.new(0, 0, item.Z)
+                end
+            end
+        end)
+    end
+
+    local function stopSpin()
+        if RenderConn then
+            RenderConn:Disconnect()
+            RenderConn = nil
+        end
+    end
+
+    local function updateVisibility()
+        local shouldShow = Enabled and (Outer and Outer.Visible or Library.Toggled)
+        Viewport.Visible = shouldShow
+        if shouldShow then
+            startSpin()
+        else
+            stopSpin()
+        end
+    end
+
+    if Outer then
+        Outer:GetPropertyChangedSignal('Visible'):Connect(updateVisibility)
+    end
+
+    updateVisibility()
+
+    local Controller = {
+        Viewport = Viewport,
+        Model = LogoModel,
+    }
+
+    function Controller:SetColor(newColor)
+        Color = newColor
+        for _, decal in ipairs(Decals) do
+            decal.Color3 = newColor
+        end
+    end
+
+    function Controller:SetAsset(newAsset)
+        Asset = newAsset
+        buildSlices(Asset, Color)
+    end
+
+    function Controller:SetSpeed(newSpeed)
+        Speed = newSpeed
+    end
+
+    function Controller:SetSize(newSize)
+        Size = newSize
+        Viewport.Size = UDim2.fromOffset(newSize, newSize)
+    end
+
+    function Controller:SetEnabled(val)
+        Enabled = val
+        updateVisibility()
+    end
+
+    function Controller:Destroy()
+        stopSpin()
+        Viewport:Destroy()
+    end
+
+    return Controller
+end;
+
 function Library:AddToolTip(InfoStr, HoverInstance)
     local X, Y = Library:GetTextBounds(InfoStr, Library.Font, Library.FontSize);
     local Tooltip = Library:Create('Frame', {
@@ -3398,6 +3564,14 @@ function Library:CreateWindow(...)
         local MinSize = Config.MinSize or defaultSize
         local MaxSize = Config.MaxSize or Vector2.new(1600, 1200)
         Window.ResizeGrip = Library:MakeResizable(Outer, MinSize, MaxSize)
+    end
+
+    if Config.BackgroundLogo then
+        local logoCfg = type(Config.BackgroundLogo) == 'table' and Config.BackgroundLogo or {}
+        logoCfg.Outer = Outer
+        logoCfg.Asset = logoCfg.Asset or Config.LogoAsset
+        logoCfg.Color = logoCfg.Color or Config.LogoColor or Library.AccentColor
+        Window.Logo = Library:Create3DLogo(logoCfg)
     end
 
 
