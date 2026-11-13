@@ -3896,6 +3896,22 @@ function Library:CreateWindow(...)
         end
     end
 
+    -- Wire up ToggleKeybind: pressing Library.ToggleKeybind will toggle the UI
+    InputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            local keybindName = Library.ToggleKeybind
+            if keybindName and input.KeyCode.Name == keybindName then
+                Library:Toggle()
+            end
+        end
+    end)
+
+    -- AutoShow: if CreateWindow was called with AutoShow=true, show immediately
+    if Config.AutoShow then
+        Library:Toggle()
+    end
+
     Window.Holder = Outer;
     return Window;
 end;
@@ -4437,7 +4453,8 @@ local SaveManager = {} do
 
 		for _, option in next, decoded.objects do
 			if self.Parser[option.type] then
-				task.spawn(function() self.Parser[option.type].Load(option.idx, option) end) 
+				task.spawn(function() self.Parser[option.type].Load(option.idx, option) end)
+			end
 		end
 
 		return true
