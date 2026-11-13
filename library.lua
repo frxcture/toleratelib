@@ -473,7 +473,7 @@ function Library:Create3DLogo(Config)
     Config = Config or {}
     local Outer = Config.Outer
     local Asset = Config.Asset or ''
-    local Color = Config.Color or Library.AccentColor
+    local Color = Config.Color or Color3.fromRGB(255, 255, 255)
     local Size = Config.Size or 340
     local Speed = Config.Speed or 40
     local Enabled = Config.Enabled ~= false
@@ -497,7 +497,7 @@ function Library:Create3DLogo(Config)
     Camera.Parent = Viewport
     Viewport.CurrentCamera = Camera
 
-    Viewport.Ambient = Color3.fromRGB(160, 160, 160)
+    Viewport.Ambient = Color3.fromRGB(220, 220, 220)
     Viewport.LightColor = Color3.fromRGB(255, 255, 255)
     Viewport.LightDirection = Vector3.new(-1, 1.2, 1).Unit
 
@@ -3570,7 +3570,7 @@ function Library:CreateWindow(...)
         local logoCfg = type(Config.BackgroundLogo) == 'table' and Config.BackgroundLogo or {}
         logoCfg.Outer = Outer
         logoCfg.Asset = logoCfg.Asset or Config.LogoAsset
-        logoCfg.Color = logoCfg.Color or Config.LogoColor or Library.AccentColor
+        logoCfg.Color = logoCfg.Color or Config.LogoColor or Color3.fromRGB(255, 255, 255)
         Window.Logo = Library:Create3DLogo(logoCfg)
     end
 
