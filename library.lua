@@ -325,7 +325,10 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
         defaultSize = Vector2.new(550, 600)
     end
 
-    MinSize = MinSize or defaultSize
+    MinSize = Vector2.new(
+        math.max(MinSize and MinSize.X or 0, defaultSize.X),
+        math.max(MinSize and MinSize.Y or 0, defaultSize.Y)
+    )
     MaxSize = MaxSize or Vector2.new(1600, 1200)
 
     local GripSize = 24
