@@ -303,19 +303,20 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow)
                 return
             end
 
-            local abs_pos = Instance.AbsolutePosition
-            if Instance.AnchorPoint ~= Vector2.new(0, 0) then
+            local DragStart = Input.Position
+
+            if (DragStart.Y - Instance.AbsolutePosition.Y) > (Cutoff or 40) then
+                return
+            end
+
+            if IsWindow and Instance.AnchorPoint ~= Vector2.new(0, 0) then
+                local abs_pos = Instance.AbsolutePosition
                 Instance.AnchorPoint = Vector2.new(0, 0)
                 Instance.Position = UDim2.fromOffset(abs_pos.X, abs_pos.Y)
             end
 
             local start_abs = Instance.AbsolutePosition
             local StartPos = Instance.Position
-            local DragStart = Input.Position
-
-            if (DragStart.Y - start_abs.Y) > (Cutoff or 40) then
-                return
-            end
 
             local Dragging = true
             local HasMoved = false
@@ -422,11 +423,14 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
         Parent = Instance,
     })
 
-    local GripSector = Library:Create('Frame', {
-        Name = 'GripSector',
+    local triSize = GripVisualSize + 2
+
+    local GripClip = Library:Create('Frame', {
+        Name = 'GripClip',
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
-        Size = UDim2.fromOffset(GripVisualSize, GripVisualSize),
+        ClipsDescendants = true,
+        Size = UDim2.fromOffset(triSize, triSize),
         Position = UDim2.new(1, 0, 1, 0),
         AnchorPoint = Vector2.new(1, 1),
         ZIndex = 51,
@@ -434,39 +438,35 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
         Parent = Grip,
     })
 
-    local stripe_w = math.ceil(GripVisualSize * 0.55)
-    local stripe_h = 2
-    for idx = 1, 3 do
-        local offset = (idx - 1) * 4
-        local stripe = Library:Create('Frame', {
-            BackgroundColor3 = Library.AccentColor,
-            BackgroundTransparency = 0.3,
-            BorderSizePixel = 0,
-            Size = UDim2.fromOffset(stripe_w - offset, stripe_h),
-            Position = UDim2.fromOffset(offset, GripVisualSize - stripe_h - (idx - 1) * 4),
-            Rotation = -45,
-            ZIndex = 52,
-            Active = false,
-            Parent = GripSector,
-        })
-        Library:AddToRegistry(stripe, { BackgroundColor3 = 'AccentColor' })
-    end
+    local GripSector = Library:Create('Frame', {
+        Name = 'GripSector',
+        BackgroundColor3 = Library.AccentColor,
+        BackgroundTransparency = 0.3,
+        BorderSizePixel = 0,
+        Size = UDim2.fromOffset(triSize * 2, triSize * 2),
+        Position = UDim2.fromOffset(triSize, 0),
+        AnchorPoint = Vector2.new(0.5, 0),
+        Rotation = 45,
+        ZIndex = 52,
+        Active = false,
+        Parent = GripClip,
+    })
+
+    Library:AddToRegistry(GripSector, { BackgroundColor3 = 'AccentColor' })
 
     local isResizing = false
 
-    local function set_stripe_alpha(a)
-        for _, ch in ipairs(GripSector:GetChildren()) do
-            if ch:IsA('Frame') then ch.BackgroundTransparency = a end
-        end
+    local function set_grip_alpha(a)
+        GripSector.BackgroundTransparency = a
     end
 
     Grip.MouseEnter:Connect(function()
-        set_stripe_alpha(0.0)
+        set_grip_alpha(0.0)
     end)
 
     Grip.MouseLeave:Connect(function()
         if not isResizing then
-            set_stripe_alpha(0.3)
+            set_grip_alpha(0.3)
         end
     end)
 
@@ -477,7 +477,7 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
         end
 
         isResizing = true
-        set_stripe_alpha(0.0)
+        set_grip_alpha(0.0)
 
         local startSize = Instance.AbsoluteSize
         local startPos  = Instance.AbsolutePosition
@@ -553,7 +553,7 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
             ChangedConn:Disconnect()
             EndedConn:Disconnect()
             isResizing = false
-            set_stripe_alpha(0.3)
+            set_grip_alpha(0.3)
 
             if Library.WireframeDrag and Wireframe then
                 if HasMoved then
@@ -4453,7 +4453,7 @@ if Library.is_mobile or (InputService.TouchEnabled and not InputService.Keyboard
     end
 
     local ToggleOuter, ToggleBtn = CreateMobileButton("Toggle", "toggle", UDim2.new(0, 12, 0, 12))
-    local LockOuter, LockBtn = CreateMobileButton("Lock", "lock", UDim2.new(0, 12, 0, 12 + BTN_SIZE + BTN_GAP))
+    local LockOuter, LockBtn = CreateMobileButton("Unlock", "unlock", UDim2.new(0, 12, 0, 12 + BTN_SIZE + BTN_GAP))
 
     local function BindMobileButtonAction(Btn, Outer, ClickAction)
         local dragging = false
@@ -4534,11 +4534,11 @@ if Library.is_mobile or (InputService.TouchEnabled and not InputService.Keyboard
     BindMobileButtonAction(LockBtn, LockOuter, function()
         Library.drag_locked = not Library.drag_locked
         if Library.drag_locked then
-            LockBtn.Text = "lock"
-            LockBtn.TextColor3 = Library.FontColor
-        else
             LockBtn.Text = "unlock"
             LockBtn.TextColor3 = Library.AccentColor
+        else
+            LockBtn.Text = "lock"
+            LockBtn.TextColor3 = Library.FontColor
         end
     end)
 
@@ -4547,9 +4547,9 @@ if Library.is_mobile or (InputService.TouchEnabled and not InputService.Keyboard
         _origUpdate(self)
         if LockBtn then
             if Library.drag_locked then
-                LockBtn.TextColor3 = Library.FontColor
-            else
                 LockBtn.TextColor3 = Library.AccentColor
+            else
+                LockBtn.TextColor3 = Library.FontColor
             end
         end
     end
