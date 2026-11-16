@@ -1,4 +1,3 @@
---hi bye 
 local genv = (type(getgenv) == "function" and getgenv()) or _G
 if genv.library and type(genv.library.unload) == "function" then
     pcall(function() genv.library:unload() end)
@@ -327,14 +326,12 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow, DragButton)
             end
         end
 
-        local start_pos = Instance.AbsolutePosition
-        local start_size = Instance.AbsoluteSize
-        local drag_start = Input.Position
-
-        if Instance.AnchorPoint ~= Vector2.new(0, 0) then
-            Instance.AnchorPoint = Vector2.new(0, 0)
-            Instance.Position = UDim2.fromOffset(start_pos.X, start_pos.Y)
+        local start_pos = Vector2.new(Instance.Position.X.Offset, Instance.Position.Y.Offset)
+        local start_size = Vector2.new(Instance.Size.X.Offset, Instance.Size.Y.Offset)
+        if start_size.X <= 0 or start_size.Y <= 0 then
+            start_size = Instance.AbsoluteSize
         end
+        local drag_start = Input.Position
 
         if Input.UserInputType == Enum.UserInputType.MouseButton1 then
             local Wireframe = Library:Create("Frame", {
@@ -362,9 +359,14 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow, DragButton)
 
             local function update_wireframe(pos)
                 local delta = pos - drag_start
-                local vp = get_viewport()
-                last_x = math.clamp(start_pos.X + delta.X, -start_size.X + 80, vp.X - 80)
-                last_y = math.clamp(start_pos.Y + delta.Y, 0, math.max(0, vp.Y - 35))
+                if Library.is_mobile then
+                    local vp = get_viewport()
+                    last_x = math.clamp(start_pos.X + delta.X, 0, math.max(0, vp.X - start_size.X))
+                    last_y = math.clamp(start_pos.Y + delta.Y, 0, math.max(0, vp.Y - start_size.Y))
+                else
+                    last_x = start_pos.X + delta.X
+                    last_y = start_pos.Y + delta.Y
+                end
                 if math.abs(delta.X) > 2 or math.abs(delta.Y) > 2 then
                     has_moved = true
                 end
@@ -400,9 +402,14 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow, DragButton)
                 if change == Input or change.UserInputType == Enum.UserInputType.Touch then
                     if IsWindow and Library.drag_locked then return end
                     local delta = change.Position - drag_start
-                    local vp = get_viewport()
-                    last_x = math.clamp(start_pos.X + delta.X, -start_size.X + 80, vp.X - 80)
-                    last_y = math.clamp(start_pos.Y + delta.Y, 0, math.max(0, vp.Y - 35))
+                    if Library.is_mobile then
+                        local vp = get_viewport()
+                        last_x = math.clamp(start_pos.X + delta.X, 0, math.max(0, vp.X - start_size.X))
+                        last_y = math.clamp(start_pos.Y + delta.Y, 0, math.max(0, vp.Y - start_size.Y))
+                    else
+                        last_x = start_pos.X + delta.X
+                        last_y = start_pos.Y + delta.Y
+                    end
                     Instance.Position = UDim2.fromOffset(last_x, last_y)
                 end
             end)
@@ -518,14 +525,12 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
         isResizing = true
         set_grip_alpha(0.1)
 
-        local startSize = Instance.AbsoluteSize
-        local startPos  = Instance.AbsolutePosition
-        local dragStart = Input.Position
-
-        if Instance.AnchorPoint ~= Vector2.new(0, 0) then
-            Instance.AnchorPoint = Vector2.new(0, 0)
-            Instance.Position = UDim2.fromOffset(startPos.X, startPos.Y)
+        local startSize = Vector2.new(Instance.Size.X.Offset, Instance.Size.Y.Offset)
+        if startSize.X <= 0 or startSize.Y <= 0 then
+            startSize = Instance.AbsoluteSize
         end
+        local startPos  = Vector2.new(Instance.Position.X.Offset, Instance.Position.Y.Offset)
+        local dragStart = Input.Position
 
         if Input.UserInputType == Enum.UserInputType.MouseButton1 then
             local Wireframe = Library:Create('Frame', {
@@ -553,19 +558,20 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
 
             local function update_resize(pos)
                 local delta = pos - dragStart
-                local vp = get_viewport()
-
-                local max_w = math.max(100, vp.X - startPos.X - 4)
-                local max_h = math.max(100, vp.Y - startPos.Y - 4)
-
-                local effective_min_w = math.min(MinSize.X, max_w)
-                local effective_min_h = math.min(MinSize.Y, max_h)
-
-                local limit_max_w = math.max(effective_min_w, math.min(MaxSize.X, max_w))
-                local limit_max_h = math.max(effective_min_h, math.min(MaxSize.Y, max_h))
-
-                last_w = math.clamp(startSize.X + delta.X, effective_min_w, limit_max_w)
-                last_h = math.clamp(startSize.Y + delta.Y, effective_min_h, limit_max_h)
+                if Library.is_mobile then
+                    local vp = get_viewport()
+                    local max_w = math.max(100, vp.X - startPos.X - 4)
+                    local max_h = math.max(100, vp.Y - startPos.Y - 4)
+                    local effective_min_w = math.min(MinSize.X, max_w)
+                    local effective_min_h = math.min(MinSize.Y, max_h)
+                    local limit_max_w = math.max(effective_min_w, math.min(MaxSize.X, max_w))
+                    local limit_max_h = math.max(effective_min_h, math.min(MaxSize.Y, max_h))
+                    last_w = math.clamp(startSize.X + delta.X, effective_min_w, limit_max_w)
+                    last_h = math.clamp(startSize.Y + delta.Y, effective_min_h, limit_max_h)
+                else
+                    last_w = math.clamp(startSize.X + delta.X, MinSize.X, MaxSize.X)
+                    last_h = math.clamp(startSize.Y + delta.Y, MinSize.Y, MaxSize.Y)
+                end
 
                 if math.abs(last_w - startSize.X) > 2 or math.abs(last_h - startSize.Y) > 2 then
                     has_moved = true
@@ -603,21 +609,22 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
             move_conn = InputService.InputChanged:Connect(function(change)
                 if change == Input or change.UserInputType == Enum.UserInputType.Touch then
                     local delta = change.Position - dragStart
-                    local vp = get_viewport()
-
-                    local max_w = math.max(100, vp.X - startPos.X - 4)
-                    local max_h = math.max(100, vp.Y - startPos.Y - 4)
-
-                    local effective_min_w = math.min(MinSize.X, max_w)
-                    local effective_min_h = math.min(MinSize.Y, max_h)
-
-                    local limit_max_w = math.max(effective_min_w, math.min(MaxSize.X, max_w))
-                    local limit_max_h = math.max(effective_min_h, math.min(MaxSize.Y, max_h))
-
-                    local newW = math.clamp(startSize.X + delta.X, effective_min_w, limit_max_w)
-                    local newH = math.clamp(startSize.Y + delta.Y, effective_min_h, limit_max_h)
-
-                    Instance.Size = UDim2.fromOffset(newW, newH)
+                    if Library.is_mobile then
+                        local vp = get_viewport()
+                        local max_w = math.max(100, vp.X - startPos.X - 4)
+                        local max_h = math.max(100, vp.Y - startPos.Y - 4)
+                        local effective_min_w = math.min(MinSize.X, max_w)
+                        local effective_min_h = math.min(MinSize.Y, max_h)
+                        local limit_max_w = math.max(effective_min_w, math.min(MaxSize.X, max_w))
+                        local limit_max_h = math.max(effective_min_h, math.min(MaxSize.Y, max_h))
+                        local w = math.clamp(startSize.X + delta.X, effective_min_w, limit_max_w)
+                        local h = math.clamp(startSize.Y + delta.Y, effective_min_h, limit_max_h)
+                        Instance.Size = UDim2.fromOffset(w, h)
+                    else
+                        local w = math.clamp(startSize.X + delta.X, MinSize.X, MaxSize.X)
+                        local h = math.clamp(startSize.Y + delta.Y, MinSize.Y, MaxSize.Y)
+                        Instance.Size = UDim2.fromOffset(w, h)
+                    end
                 end
             end)
 
@@ -625,6 +632,7 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
                 if end_input == Input or end_input.UserInputType == Enum.UserInputType.Touch then
                     if move_conn then move_conn:Disconnect(); move_conn = nil end
                     if end_conn then end_conn:Disconnect(); end_conn = nil end
+
                     isResizing = false
                     set_grip_alpha(0.3)
                 end
@@ -634,6 +642,7 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
 
     return Grip
 end;
+
 function Library:Create3DLogo(Config)
     Config = Config or {}
     local Outer = Config.Outer
@@ -3766,16 +3775,22 @@ function Library:CreateWindow(...)
         local win_w = math.clamp(vp.X - 30, 320, 520)
         local win_h = math.clamp(vp.Y - 30, 240, 360)
         Config.Size = UDim2.fromOffset(win_w, win_h)
-        Config.Position = UDim2.fromScale(0.5, 0.5)
-        Config.AnchorPoint = Vector2.new(0.5, 0.5)
         Config.MinSize = Vector2.new(math.min(300, win_w), math.min(220, win_h))
         Config.MaxSize = Vector2.new(math.max(win_w, vp.X - 10), math.max(win_h, vp.Y - 10))
-        Config.Center = true
+        Config.Position = UDim2.fromOffset(math.max(0, math.floor((vp.X - win_w) / 2)), math.max(0, math.floor((vp.Y - win_h) / 2)))
+        Config.AnchorPoint = Vector2.new(0, 0)
+        Config.Center = false
     end
 
     if Config.Center then
-        Config.AnchorPoint = Vector2.new(0.5, 0.5)
-        Config.Position = UDim2.fromScale(0.5, 0.5)
+        local cam = workspace.CurrentCamera
+        local vp = (cam and cam.ViewportSize) or Vector2.new(1920, 1080)
+        local win_w = Config.Size.X.Offset
+        local win_h = Config.Size.Y.Offset
+        Config.AnchorPoint = Vector2.new(0, 0)
+        Config.Position = UDim2.fromOffset(math.max(0, math.floor((vp.X - win_w) / 2)), math.max(0, math.floor((vp.Y - win_h) / 2)))
+    else
+        Config.AnchorPoint = Vector2.new(0, 0)
     end
 
     if Config.WireframeDrag ~= nil then
