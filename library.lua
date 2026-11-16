@@ -1,3 +1,4 @@
+--lmao
 local genv = (type(getgenv) == "function" and getgenv()) or _G
 if genv.library and type(genv.library.unload) == "function" then
     pcall(function() genv.library:unload() end)
@@ -995,6 +996,10 @@ end
 function Library:Unload()
     if Library._unloading then return end
     Library._unloading = true
+
+    pcall(function() RunService:UnbindFromRenderStep("__tolerate_cursor") end)
+    pcall(function() InputService.MouseIconEnabled = true end)
+    pcall(function() Mouse.Icon = "" end)
 
     local cb = Library._unload_callback
     Library._unload_callback = nil
@@ -3603,6 +3608,7 @@ function Library:SetWatermark(Text)
     Library.WatermarkText.Text = ForceLowerCase(Text);
 end;
 function Library:Notify(Text, Time)
+    if Library.UpdateNotifAlignment then Library.UpdateNotifAlignment() end
     Text = ForceLowerCase(Text);
     local cfg     = Library.NotifyConfig
     local barSide = cfg.BarSide   or 'Left'    
@@ -4389,6 +4395,8 @@ function Library:CreateWindow(...)
         if Library.Toggled then
             task.spawn(function()
                 local State = InputService.MouseIconEnabled;
+                local saved_icon = ""
+                pcall(function() saved_icon = Mouse.Icon end)
 
                 if Library.is_mobile or not Library.CloudCursorEnabled or not Drawing then
                     return;
@@ -4400,6 +4408,15 @@ function Library:CreateWindow(...)
                 Cursor.Visible = true;
 
                 local lastPos = nil;
+
+                pcall(function()
+                    RunService:BindToRenderStep("__tolerate_cursor", Enum.RenderPriority.Last.Value, function()
+                        InputService.MouseIconEnabled = false
+                        if Mouse.Icon ~= "rbxassetid://0" then
+                            Mouse.Icon = "rbxassetid://0"
+                        end
+                    end)
+                end)
 
                 while Library.Toggled and ScreenGui.Parent do
                     InputService.MouseIconEnabled = false;
@@ -4418,10 +4435,16 @@ function Library:CreateWindow(...)
                     RenderStepped:Wait();
                 end;
 
+                pcall(function() RunService:UnbindFromRenderStep("__tolerate_cursor") end)
+                pcall(function() Mouse.Icon = saved_icon end)
                 InputService.MouseIconEnabled = State;
 
                 Cursor:Remove();
             end);
+        else
+            pcall(function() RunService:UnbindFromRenderStep("__tolerate_cursor") end)
+            pcall(function() InputService.MouseIconEnabled = true end)
+            pcall(function() Mouse.Icon = "" end)
         end;
         if Library.UseBlur then
             if Library.Toggled then
@@ -5252,3 +5275,4 @@ getgenv().theme_manager = Library.ThemeManager
 getgenv().save_manager = Library.SaveManager
 
 return Library
+
