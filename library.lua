@@ -1,3 +1,4 @@
+--hi bye 
 local genv = (type(getgenv) == "function" and getgenv()) or _G
 if genv.library and type(genv.library.unload) == "function" then
     pcall(function() genv.library:unload() end)
@@ -55,6 +56,7 @@ local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 
 local ScreenGui = Instance.new('ScreenGui');
 ProtectGui(ScreenGui);
+ScreenGui.IgnoreGuiInset = true;
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global;
 ScreenGui.Parent = CoreGui;
 
@@ -300,6 +302,9 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow, DragButton)
     Handle.Active = true;
 
     local function get_viewport()
+        if ScreenGui and ScreenGui.AbsoluteSize.X > 0 and ScreenGui.AbsoluteSize.Y > 0 then
+            return ScreenGui.AbsoluteSize
+        end
         local cam = workspace.CurrentCamera
         return (cam and cam.ViewportSize) or Vector2.new(1920, 1080)
     end
@@ -358,8 +363,8 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow, DragButton)
             local function update_wireframe(pos)
                 local delta = pos - drag_start
                 local vp = get_viewport()
-                last_x = math.clamp(start_pos.X + delta.X, 0, math.max(0, vp.X - start_size.X))
-                last_y = math.clamp(start_pos.Y + delta.Y, 0, math.max(0, vp.Y - start_size.Y))
+                last_x = math.clamp(start_pos.X + delta.X, -start_size.X + 80, vp.X - 80)
+                last_y = math.clamp(start_pos.Y + delta.Y, 0, math.max(0, vp.Y - 35))
                 if math.abs(delta.X) > 2 or math.abs(delta.Y) > 2 then
                     has_moved = true
                 end
@@ -396,8 +401,8 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow, DragButton)
                     if IsWindow and Library.drag_locked then return end
                     local delta = change.Position - drag_start
                     local vp = get_viewport()
-                    last_x = math.clamp(start_pos.X + delta.X, 0, math.max(0, vp.X - start_size.X))
-                    last_y = math.clamp(start_pos.Y + delta.Y, 0, math.max(0, vp.Y - start_size.Y))
+                    last_x = math.clamp(start_pos.X + delta.X, -start_size.X + 80, vp.X - 80)
+                    last_y = math.clamp(start_pos.Y + delta.Y, 0, math.max(0, vp.Y - 35))
                     Instance.Position = UDim2.fromOffset(last_x, last_y)
                 end
             end)
@@ -427,8 +432,8 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
     )
     MaxSize = MaxSize or Vector2.new(1600, 1200)
 
-    local GripVisualSize = 28
-    local GripTouchSize = Library.is_mobile and 38 or 32
+    local GripVisualSize = Library.is_mobile and 28 or 16
+    local GripTouchSize = Library.is_mobile and 38 or 24
 
     local Grip = Library:Create('TextButton', {
         Name = 'ResizeGrip',
@@ -497,6 +502,9 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
     end)
 
     local function get_viewport()
+        if ScreenGui and ScreenGui.AbsoluteSize.X > 0 and ScreenGui.AbsoluteSize.Y > 0 then
+            return ScreenGui.AbsoluteSize
+        end
         local cam = workspace.CurrentCamera
         return (cam and cam.ViewportSize) or Vector2.new(1920, 1080)
     end
@@ -979,13 +987,9 @@ function Library:Unload()
     if Library._unloading then return end
     Library._unloading = true
 
-    local cb1 = Library.OnUnload
-    local cb2 = Library.on_unload
-    Library.OnUnload = nil
-    Library.on_unload = nil
-
-    if cb1 then pcall(cb1) end
-    if cb2 and cb2 ~= cb1 then pcall(cb2) end
+    local cb = Library._unload_callback
+    Library._unload_callback = nil
+    if cb then pcall(cb) end
 
     for Idx = #Library.Signals, 1, -1 do
         local Connection = table.remove(Library.Signals, Idx)
@@ -1009,7 +1013,7 @@ function Library:Unload()
 end
 
 function Library:OnUnload(Callback)
-    Library.OnUnload = Callback
+    Library._unload_callback = Callback
 end
 
 Library:GiveSignal(ScreenGui.DescendantRemoving:Connect(function(Instance)
