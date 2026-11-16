@@ -122,6 +122,15 @@ local Library = {
 
 Library.KeyPickerList = {};
 
+function Library:Toggle()
+    if Library.CurrentWindow and Library.CurrentWindow.Holder then
+        Library.Toggled = not Library.Toggled
+        Library.WindowOpen = Library.Toggled
+        Library.CurrentWindow.Holder.Visible = Library.Toggled
+    end
+end
+Library.toggle = Library.Toggle
+
 Library.BlurEffect = Instance.new("BlurEffect")
 Library.BlurEffect.Name = "tolerate_blur"
 Library.BlurEffect.Size = 0
@@ -3615,17 +3624,39 @@ function Library:Notify(Text, Time)
 end;
 
 function Library:CreateWindow(...)
-    local Arguments = { ... }
-    local Config = { AnchorPoint = Vector2.zero }
-
-    if type(...) == 'table' then
-        Config = ...;
-    else
-        Config.Title = Arguments[1]
-        Config.AutoShow = Arguments[2] or false;
+    local args = { ... }
+    local Config = nil
+    if type(self) == "table" and self ~= Library and (self.Title or self.Size or self.AutoShow ~= nil or self.Center ~= nil) then
+        Config = self
+    end
+    if not Config then
+        for i = 1, #args do
+            local arg = args[i]
+            if type(arg) == "table" and arg ~= Library then
+                Config = arg
+                break
+            end
+        end
+    end
+    if not Config then
+        if type(...) == "table" and (...) ~= Library then
+            Config = ...
+        end
+    end
+    if not Config then
+        Config = {
+            Title = args[1] or "tolerate",
+            AutoShow = true,
+        }
+    end
+    if Config.AutoShow == nil then
+        Config.AutoShow = true
+    end
+    if Config.AnchorPoint == nil then
+        Config.AnchorPoint = Vector2.zero
     end
 
-    if type(Config.Title) ~= 'string' then Config.Title = 'No title' end
+    if type(Config.Title) ~= 'string' then Config.Title = 'tolerate' end
     if type(Config.TabPadding) ~= 'number' then Config.TabPadding = 0 end
     if type(Config.MenuFadeTime) ~= 'number' then Config.MenuFadeTime = 0.2 end
 
@@ -4290,11 +4321,21 @@ function Library:CreateWindow(...)
         end
     end)
 
+    Window.Holder = Outer;
+    Window.outer = Outer;
+    Window.Toggle = Library.Toggle;
+    Window.toggle = Library.Toggle;
+    Library.CurrentWindow = Window;
+    Library.toggle = Library.Toggle;
+
     if Config.AutoShow then
-        Library:Toggle()
+        task.defer(function()
+            if not Library.Toggled then
+                Library:Toggle()
+            end
+        end)
     end
 
-    Window.Holder = Outer;
     return Window;
 end;
 
@@ -4332,7 +4373,7 @@ if Library.is_mobile or (InputService.TouchEnabled and not InputService.Keyboard
             Size = UDim2.fromOffset(BTN_SIZE, BTN_SIZE),
             ZIndex = 900,
             Parent = MobileGui,
-            Active = true,
+            Active = false,
         })
         Library:Create('UICorner', {
             CornerRadius = UDim.new(0, 8),
@@ -4348,6 +4389,7 @@ if Library.is_mobile or (InputService.TouchEnabled and not InputService.Keyboard
             Size = UDim2.new(1, -2, 1, -2),
             ZIndex = 901,
             Parent = Outer,
+            Active = false,
         })
         Library:Create('UICorner', {
             CornerRadius = UDim.new(0, 7),
@@ -4363,6 +4405,7 @@ if Library.is_mobile or (InputService.TouchEnabled and not InputService.Keyboard
             Size = UDim2.new(1, -2, 1, -2),
             ZIndex = 902,
             Parent = AccentFrame,
+            Active = false,
         })
         Library:Create('UICorner', {
             CornerRadius = UDim.new(0, 6),
@@ -4381,6 +4424,7 @@ if Library.is_mobile or (InputService.TouchEnabled and not InputService.Keyboard
             ZIndex = 904,
             Parent = Inner,
             Active = true,
+            AutoButtonColor = true,
         })
         Library:AddToRegistry(Btn, { TextColor3 = 'FontColor' })
 
@@ -4392,10 +4436,18 @@ if Library.is_mobile or (InputService.TouchEnabled and not InputService.Keyboard
 
     local function BindMobileButtonAction(Btn, Outer, ClickAction)
         local dragging = false
-        local dragInput = nil
         local dragStart = nil
         local startPos = nil
         local hasMoved = false
+        local dragInput = nil
+        local lastTrigger = 0
+
+        local function trigger()
+            local now = os.clock()
+            if now - lastTrigger < 0.25 then return end
+            lastTrigger = now
+            ClickAction()
+        end
 
         Btn.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -4405,38 +4457,57 @@ if Library.is_mobile or (InputService.TouchEnabled and not InputService.Keyboard
                 startPos = Outer.Position
                 dragInput = input
 
-                local connection
-                connection = input.Changed:Connect(function()
-                    if input.UserInputState == Enum.UserInputState.End then
-                        dragging = false
-                        connection:Disconnect()
-                        if not hasMoved then
-                            ClickAction()
+                local connChanged, connEnded
+                connChanged = InputService.InputChanged:Connect(function(change)
+                    if dragging and (change == dragInput or change.UserInputType == Enum.UserInputType.MouseMovement or change.UserInputType == Enum.UserInputType.Touch) then
+                        local delta = change.Position - dragStart
+                        if delta.Magnitude > 6 then
+                            hasMoved = true
+                            local cam = workspace.CurrentCamera
+                            local vp = (cam and cam.ViewportSize) or Vector2.new(1920, 1080)
+                            local new_x = math.clamp(startPos.X.Offset + delta.X, 0, math.max(0, vp.X - BTN_SIZE))
+                            local new_y = math.clamp(startPos.Y.Offset + delta.Y, 0, math.max(0, vp.Y - BTN_SIZE))
+                            Outer.Position = UDim2.fromOffset(new_x, new_y)
+                        end
+                    end
+                end)
+
+                connEnded = InputService.InputEnded:Connect(function(endInput)
+                    if endInput == dragInput or endInput.UserInputType == Enum.UserInputType.MouseButton1 or endInput.UserInputType == Enum.UserInputType.Touch then
+                        if dragging then
+                            dragging = false
+                            if connChanged then connChanged:Disconnect(); connChanged = nil end
+                            if connEnded then connEnded:Disconnect(); connEnded = nil end
+                            if not hasMoved then
+                                trigger()
+                            end
                         end
                     end
                 end)
             end
         end)
 
-        InputService.InputChanged:Connect(function(input)
-            if input == dragInput and dragging then
-                local delta = input.Position - dragStart
-                if delta.Magnitude > 4 then
-                    hasMoved = true
-                end
-                if hasMoved then
-                    local cam = workspace.CurrentCamera
-                    local vp = (cam and cam.ViewportSize) or Vector2.new(1920, 1080)
-                    local new_x = math.clamp(startPos.X.Offset + delta.X, 0, math.max(0, vp.X - BTN_SIZE))
-                    local new_y = math.clamp(startPos.Y.Offset + delta.Y, 0, math.max(0, vp.Y - BTN_SIZE))
-                    Outer.Position = UDim2.fromOffset(new_x, new_y)
-                end
+        Btn.MouseButton1Click:Connect(function()
+            if not hasMoved then
+                trigger()
             end
         end)
+
+        if Btn.Activated then
+            Btn.Activated:Connect(function()
+                if not hasMoved then
+                    trigger()
+                end
+            end)
+        end
     end
 
     BindMobileButtonAction(ToggleBtn, ToggleOuter, function()
-        Library:Toggle()
+        if Library.Toggle then
+            Library:Toggle()
+        elseif Library.toggle then
+            Library:toggle()
+        end
     end)
 
     BindMobileButtonAction(LockBtn, LockOuter, function()
