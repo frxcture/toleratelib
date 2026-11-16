@@ -302,11 +302,18 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow)
             if IsWindow and Library.drag_locked then
                 return
             end
-            local StartPos = Instance.Position
+
+            local abs_pos = Instance.AbsolutePosition
+            if Instance.AnchorPoint ~= Vector2.new(0, 0) then
+                Instance.AnchorPoint = Vector2.new(0, 0)
+                Instance.Position = UDim2.fromOffset(abs_pos.X, abs_pos.Y)
+            end
+
             local start_abs = Instance.AbsolutePosition
+            local StartPos = Instance.Position
             local DragStart = Input.Position
 
-            if (DragStart.Y - Instance.AbsolutePosition.Y) > (Cutoff or 40) then
+            if (DragStart.Y - start_abs.Y) > (Cutoff or 40) then
                 return
             end
 
@@ -333,8 +340,8 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow)
                             
                             Wireframe = Library:Create("Frame", {
                                 Size = Instance.Size,
-                                Position = Instance.Position,
-                                AnchorPoint = Instance.AnchorPoint,
+                                Position = UDim2.fromOffset(start_abs.X, start_abs.Y),
+                                AnchorPoint = Vector2.new(0, 0),
                                 BackgroundTransparency = 1,
                                 Active = false,
                                 ZIndex = 100000,
@@ -417,35 +424,49 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
 
     local GripSector = Library:Create('Frame', {
         Name = 'GripSector',
-        BackgroundColor3 = Library.AccentColor,
-        BackgroundTransparency = 0.3,
+        BackgroundTransparency = 1,
         BorderSizePixel = 0,
-        Size = UDim2.fromOffset(GripVisualSize * 2, GripVisualSize * 2),
-        Position = UDim2.fromOffset(GripVisualSize, GripVisualSize),
-        AnchorPoint = Vector2.new(0.5, 0.5),
+        Size = UDim2.fromOffset(GripVisualSize, GripVisualSize),
+        Position = UDim2.new(1, 0, 1, 0),
+        AnchorPoint = Vector2.new(1, 1),
         ZIndex = 51,
         Active = false,
         Parent = Grip,
     })
 
-    Library:Create('UICorner', {
-        CornerRadius = UDim.new(1, 0),
-        Parent = GripSector,
-    })
-
-    Library:AddToRegistry(GripSector, {
-        BackgroundColor3 = 'AccentColor',
-    })
+    local stripe_w = math.ceil(GripVisualSize * 0.55)
+    local stripe_h = 2
+    for idx = 1, 3 do
+        local offset = (idx - 1) * 4
+        local stripe = Library:Create('Frame', {
+            BackgroundColor3 = Library.AccentColor,
+            BackgroundTransparency = 0.3,
+            BorderSizePixel = 0,
+            Size = UDim2.fromOffset(stripe_w - offset, stripe_h),
+            Position = UDim2.fromOffset(offset, GripVisualSize - stripe_h - (idx - 1) * 4),
+            Rotation = -45,
+            ZIndex = 52,
+            Active = false,
+            Parent = GripSector,
+        })
+        Library:AddToRegistry(stripe, { BackgroundColor3 = 'AccentColor' })
+    end
 
     local isResizing = false
 
+    local function set_stripe_alpha(a)
+        for _, ch in ipairs(GripSector:GetChildren()) do
+            if ch:IsA('Frame') then ch.BackgroundTransparency = a end
+        end
+    end
+
     Grip.MouseEnter:Connect(function()
-        GripSector.BackgroundTransparency = 0.15
+        set_stripe_alpha(0.0)
     end)
 
     Grip.MouseLeave:Connect(function()
         if not isResizing then
-            GripSector.BackgroundTransparency = 0.3
+            set_stripe_alpha(0.3)
         end
     end)
 
@@ -456,7 +477,7 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
         end
 
         isResizing = true
-        GripSector.BackgroundTransparency = 0.1
+        set_stripe_alpha(0.0)
 
         local startSize = Instance.AbsoluteSize
         local startPos  = Instance.AbsolutePosition
@@ -532,7 +553,7 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
             ChangedConn:Disconnect()
             EndedConn:Disconnect()
             isResizing = false
-            GripSector.BackgroundTransparency = 0.3
+            set_stripe_alpha(0.3)
 
             if Library.WireframeDrag and Wireframe then
                 if HasMoved then
