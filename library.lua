@@ -91,8 +91,8 @@ local Library = {
     FontSize = 14,
     IsMobile = is_mobile_detected,
     is_mobile = is_mobile_detected,
-    DragLocked = true,
-    drag_locked = true,
+    DragLocked = is_mobile_detected,
+    drag_locked = is_mobile_detected,
 
     CloudCursorEnabled = true,
     CursorSize = 17,
@@ -106,7 +106,7 @@ local Library = {
     Toggled = false;
     WindowOpen = false;
     dpc = Color3.fromRGB(255, 255, 255);
-    WireframeDrag = false;
+    WireframeDrag = true;
     UseBlur = false;
     BlurSize = 15;
 
@@ -303,14 +303,14 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow)
             return
         end
 
-        if IsWindow and Library.drag_locked then
+        if IsWindow and Library.is_mobile and Library.drag_locked then
             return
         end
 
         local input_pos = Input.Position
         local inst_abs = Instance.AbsolutePosition
         local diff_y = input_pos.Y - inst_abs.Y
-        if diff_y > (Cutoff or 35) or diff_y < 0 then
+        if diff_y > (Cutoff or 40) then
             return
         end
 
@@ -326,18 +326,54 @@ function Library:MakeDraggable(Instance, Cutoff, IsWindow)
         end
 
         if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local offset_x = Mouse.X - Instance.AbsolutePosition.X
-            local offset_y = Mouse.Y - Instance.AbsolutePosition.Y
+            local start_pos = Instance.AbsolutePosition
+            local start_size = Instance.AbsoluteSize
+            local offset_x = Mouse.X - start_pos.X
+            local offset_y = Mouse.Y - start_pos.Y
+
+            local Wireframe = Library:Create("Frame", {
+                Name = "DragWireframe",
+                Size = UDim2.fromOffset(start_size.X, start_size.Y),
+                Position = UDim2.fromOffset(start_pos.X, start_pos.Y),
+                AnchorPoint = Vector2.new(0, 0),
+                BackgroundTransparency = 1,
+                Active = false,
+                ZIndex = 100000,
+                Parent = ScreenGui
+            })
+
+            Library:Create("UIStroke", {
+                Color = Library.AccentColor,
+                Thickness = 1,
+                ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+                Parent = Wireframe
+            })
+
+            local has_moved = false
+            local last_clamped_x = start_pos.X
+            local last_clamped_y = start_pos.Y
 
             while InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
-                if IsWindow and Library.drag_locked then break end
                 local vp = get_viewport()
                 local target_x = Mouse.X - offset_x
                 local target_y = Mouse.Y - offset_y
-                local clamped_x = math.clamp(target_x, 0, math.max(0, vp.X - Instance.AbsoluteSize.X))
-                local clamped_y = math.clamp(target_y, 0, math.max(0, vp.Y - Instance.AbsoluteSize.Y))
-                Instance.Position = UDim2.fromOffset(clamped_x, clamped_y)
+                last_clamped_x = math.clamp(target_x, 0, math.max(0, vp.X - start_size.X))
+                last_clamped_y = math.clamp(target_y, 0, math.max(0, vp.Y - start_size.Y))
+
+                if math.abs(last_clamped_x - start_pos.X) > 2 or math.abs(last_clamped_y - start_pos.Y) > 2 then
+                    has_moved = true
+                end
+
+                Wireframe.Position = UDim2.fromOffset(last_clamped_x, last_clamped_y)
                 RenderStepped:Wait()
+            end
+
+            if has_moved then
+                Instance.Position = UDim2.fromOffset(last_clamped_x, last_clamped_y)
+            end
+
+            if Wireframe then
+                Wireframe:Destroy()
             end
         else
             local touch_start = Input.Position
@@ -385,8 +421,8 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
     )
     MaxSize = MaxSize or Vector2.new(1600, 1200)
 
-    local GripVisualSize = 16
-    local GripTouchSize = Library.is_mobile and 32 or 24
+    local GripVisualSize = 24
+    local GripTouchSize = Library.is_mobile and 36 or 28
 
     local Grip = Library:Create('TextButton', {
         Name = 'ResizeGrip',
@@ -477,43 +513,97 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
             return (cam and cam.ViewportSize) or Vector2.new(1920, 1080)
         end
 
-        local changedConn, endedConn
+        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local Wireframe = Library:Create('Frame', {
+                Name = 'ResizeWireframe',
+                Size = UDim2.fromOffset(startSize.X, startSize.Y),
+                Position = UDim2.fromOffset(startPos.X, startPos.Y),
+                AnchorPoint = Vector2.new(0, 0),
+                BackgroundTransparency = 1,
+                Active = false,
+                ZIndex = 100000,
+                Parent = ScreenGui,
+            })
 
-        changedConn = InputService.InputChanged:Connect(function(Change)
-            if Change.UserInputType ~= Enum.UserInputType.MouseMovement
-                and Change.UserInputType ~= Enum.UserInputType.Touch
-                and Change ~= Input then
-                return
+            Library:Create('UIStroke', {
+                Color = Library.AccentColor,
+                Thickness = 1,
+                ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+                Parent = Wireframe
+            })
+
+            local has_moved = false
+            local last_w = startSize.X
+            local last_h = startSize.Y
+
+            while InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
+                local vp = get_viewport()
+                local delta_x = Mouse.X - dragStart.X
+                local delta_y = Mouse.Y - dragStart.Y
+
+                local max_w = math.max(100, vp.X - startPos.X - 4)
+                local max_h = math.max(100, vp.Y - startPos.Y - 4)
+
+                local effective_min_w = math.min(MinSize.X, max_w)
+                local effective_min_h = math.min(MinSize.Y, max_h)
+
+                local limit_max_w = math.max(effective_min_w, math.min(MaxSize.X, max_w))
+                local limit_max_h = math.max(effective_min_h, math.min(MaxSize.Y, max_h))
+
+                last_w = math.clamp(startSize.X + delta_x, effective_min_w, limit_max_w)
+                last_h = math.clamp(startSize.Y + delta_y, effective_min_h, limit_max_h)
+
+                if math.abs(last_w - startSize.X) > 2 or math.abs(last_h - startSize.Y) > 2 then
+                    has_moved = true
+                end
+
+                Wireframe.Size = UDim2.fromOffset(last_w, last_h)
+                RenderStepped:Wait()
             end
 
-            local Delta = Change.Position - dragStart
-            local vp = get_viewport()
-
-            local max_w = math.max(100, vp.X - startPos.X - 4)
-            local max_h = math.max(100, vp.Y - startPos.Y - 4)
-
-            local effective_min_w = math.min(MinSize.X, max_w)
-            local effective_min_h = math.min(MinSize.Y, max_h)
-
-            local limit_max_w = math.max(effective_min_w, math.min(MaxSize.X, max_w))
-            local limit_max_h = math.max(effective_min_h, math.min(MaxSize.Y, max_h))
-
-            local newW = math.clamp(startSize.X + Delta.X, effective_min_w, limit_max_w)
-            local newH = math.clamp(startSize.Y + Delta.Y, effective_min_h, limit_max_h)
-
-            Instance.Size = UDim2.fromOffset(newW, newH)
-        end)
-
-        endedConn = InputService.InputEnded:Connect(function(EndInput)
-            if EndInput == Input
-                or EndInput.UserInputType == Enum.UserInputType.Touch
-                or EndInput.UserInputType == Enum.UserInputType.MouseButton1 then
-                if changedConn then changedConn:Disconnect(); changedConn = nil end
-                if endedConn then endedConn:Disconnect(); endedConn = nil end
-                isResizing = false
-                set_grip_alpha(0.3)
+            if has_moved then
+                Instance.Size = UDim2.fromOffset(last_w, last_h)
             end
-        end)
+
+            if Wireframe then
+                Wireframe:Destroy()
+            end
+
+            isResizing = false
+            set_grip_alpha(0.3)
+        else
+            local changedConn, endedConn
+
+            changedConn = InputService.InputChanged:Connect(function(change)
+                if change == Input or change.UserInputType == Enum.UserInputType.Touch then
+                    local delta = change.Position - dragStart
+                    local vp = get_viewport()
+
+                    local max_w = math.max(100, vp.X - startPos.X - 4)
+                    local max_h = math.max(100, vp.Y - startPos.Y - 4)
+
+                    local effective_min_w = math.min(MinSize.X, max_w)
+                    local effective_min_h = math.min(MinSize.Y, max_h)
+
+                    local limit_max_w = math.max(effective_min_w, math.min(MaxSize.X, max_w))
+                    local limit_max_h = math.max(effective_min_h, math.min(MaxSize.Y, max_h))
+
+                    local newW = math.clamp(startSize.X + delta.X, effective_min_w, limit_max_w)
+                    local newH = math.clamp(startSize.Y + delta.Y, effective_min_h, limit_max_h)
+
+                    Instance.Size = UDim2.fromOffset(newW, newH)
+                end
+            end)
+
+            endedConn = InputService.InputEnded:Connect(function(endInput)
+                if endInput == Input or endInput.UserInputType == Enum.UserInputType.Touch then
+                    if changedConn then changedConn:Disconnect(); changedConn = nil end
+                    if endedConn then endedConn:Disconnect(); endedConn = nil end
+                    isResizing = false
+                    set_grip_alpha(0.3)
+                end
+            end)
+        end
     end)
 
     return Grip
