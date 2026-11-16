@@ -106,7 +106,7 @@ local Library = {
     Toggled = false;
     WindowOpen = false;
     dpc = Color3.fromRGB(255, 255, 255);
-    WireframeDrag = true;
+    WireframeDrag = false;
     UseBlur = false;
     BlurSize = 15;
 
@@ -297,97 +297,77 @@ end;
 
 function Library:MakeDraggable(Instance, Cutoff, IsWindow)
     Instance.Active = true;
-    Instance.InputBegan:Connect(function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-            if IsWindow and Library.drag_locked then
-                return
+
+    local function handle_input(Input)
+        if Input.UserInputType ~= Enum.UserInputType.MouseButton1 and Input.UserInputType ~= Enum.UserInputType.Touch then
+            return
+        end
+
+        if IsWindow and Library.drag_locked then
+            return
+        end
+
+        local input_pos = Input.Position
+        local inst_abs = Instance.AbsolutePosition
+        local diff_y = input_pos.Y - inst_abs.Y
+        if diff_y > (Cutoff or 35) or diff_y < 0 then
+            return
+        end
+
+        if Instance.AnchorPoint ~= Vector2.new(0, 0) then
+            local abs_pos = Instance.AbsolutePosition
+            Instance.AnchorPoint = Vector2.new(0, 0)
+            Instance.Position = UDim2.fromOffset(abs_pos.X, abs_pos.Y)
+        end
+
+        local function get_viewport()
+            local cam = workspace.CurrentCamera
+            return (cam and cam.ViewportSize) or Vector2.new(1920, 1080)
+        end
+
+        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local offset_x = Mouse.X - Instance.AbsolutePosition.X
+            local offset_y = Mouse.Y - Instance.AbsolutePosition.Y
+
+            while InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
+                if IsWindow and Library.drag_locked then break end
+                local vp = get_viewport()
+                local target_x = Mouse.X - offset_x
+                local target_y = Mouse.Y - offset_y
+                local clamped_x = math.clamp(target_x, 0, math.max(0, vp.X - Instance.AbsoluteSize.X))
+                local clamped_y = math.clamp(target_y, 0, math.max(0, vp.Y - Instance.AbsoluteSize.Y))
+                Instance.Position = UDim2.fromOffset(clamped_x, clamped_y)
+                RenderStepped:Wait()
             end
+        else
+            local touch_start = Input.Position
+            local start_pos = Instance.AbsolutePosition
+            local move_conn, end_conn
 
-            local DragStart = Input.Position
-
-            if (DragStart.Y - Instance.AbsolutePosition.Y) > (Cutoff or 40) then
-                return
-            end
-
-            if IsWindow and Instance.AnchorPoint ~= Vector2.new(0, 0) then
-                local abs_pos = Instance.AbsolutePosition
-                Instance.AnchorPoint = Vector2.new(0, 0)
-                Instance.Position = UDim2.fromOffset(abs_pos.X, abs_pos.Y)
-            end
-
-            local start_abs = Instance.AbsolutePosition
-            local StartPos = Instance.Position
-
-            local Dragging = true
-            local HasMoved = false
-            local Wireframe = nil
-            local ChangedConn, EndedConn
-
-            local function get_viewport()
-                local cam = workspace.CurrentCamera
-                return (cam and cam.ViewportSize) or Vector2.new(1920, 1080)
-            end
-
-            ChangedConn = InputService.InputChanged:Connect(function(Change)
-                if Change.UserInputType == Enum.UserInputType.MouseMovement or Change.UserInputType == Enum.UserInputType.Touch or Change == Input then
-                    if IsWindow and Library.drag_locked then
-                        return
-                    end
-                    local Delta = Change.Position - DragStart
-                    
-                    if IsWindow and Library.WireframeDrag then
-                        if not HasMoved and Delta.Magnitude > 2 then
-                            HasMoved = true
-                            
-                            Wireframe = Library:Create("Frame", {
-                                Size = Instance.Size,
-                                Position = UDim2.fromOffset(start_abs.X, start_abs.Y),
-                                AnchorPoint = Vector2.new(0, 0),
-                                BackgroundTransparency = 1,
-                                Active = false,
-                                ZIndex = 100000,
-                                Parent = ScreenGui
-                            })
-
-                            Library:Create("UIStroke", {
-                                Color = Library.AccentColor,
-                                Thickness = 1,
-                                ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-                                Parent = Wireframe
-                            })
-                        end
-                        
-                        if HasMoved and Wireframe then
-                            local vp = get_viewport()
-                            local clamped_x = math.clamp(start_abs.X + Delta.X, 0, math.max(0, vp.X - Instance.AbsoluteSize.X))
-                            local clamped_y = math.clamp(start_abs.Y + Delta.Y, 0, math.max(0, vp.Y - Instance.AbsoluteSize.Y))
-                            Wireframe.Position = UDim2.fromOffset(clamped_x, clamped_y)
-                        end
-                    else
-                        local vp = get_viewport()
-                        local clamped_x = math.clamp(start_abs.X + Delta.X, 0, math.max(0, vp.X - Instance.AbsoluteSize.X))
-                        local clamped_y = math.clamp(start_abs.Y + Delta.Y, 0, math.max(0, vp.Y - Instance.AbsoluteSize.Y))
-                        Instance.Position = UDim2.fromOffset(clamped_x, clamped_y)
-                    end
+            move_conn = InputService.InputChanged:Connect(function(change)
+                if change == Input or change.UserInputType == Enum.UserInputType.Touch then
+                    if IsWindow and Library.drag_locked then return end
+                    local delta = change.Position - touch_start
+                    local vp = get_viewport()
+                    local target_x = start_pos.X + delta.X
+                    local target_y = start_pos.Y + delta.Y
+                    local clamped_x = math.clamp(target_x, 0, math.max(0, vp.X - Instance.AbsoluteSize.X))
+                    local clamped_y = math.clamp(target_y, 0, math.max(0, vp.Y - Instance.AbsoluteSize.Y))
+                    Instance.Position = UDim2.fromOffset(clamped_x, clamped_y)
                 end
             end)
 
-            EndedConn = InputService.InputEnded:Connect(function(EndInput)
-                if EndInput == Input or EndInput.UserInputType == Enum.UserInputType.Touch or EndInput.UserInputType == Enum.UserInputType.MouseButton1 then
-                    Dragging = false
-                    ChangedConn:Disconnect()
-                    EndedConn:Disconnect()
-                    
-                    if IsWindow and Library.WireframeDrag and HasMoved and Wireframe then
-                        Instance.Position = Wireframe.Position
-                        
-                        Wireframe:Destroy()
-                        Wireframe = nil
-                    end
+            end_conn = InputService.InputEnded:Connect(function(end_input)
+                if end_input == Input or end_input.UserInputType == Enum.UserInputType.Touch then
+                    if move_conn then move_conn:Disconnect(); move_conn = nil end
+                    if end_conn then end_conn:Disconnect(); end_conn = nil end
                 end
             end)
         end
-    end)
+    end
+
+    Instance.InputBegan:Connect(handle_input)
+    return handle_input
 end;
 
 function Library:MakeResizable(Instance, MinSize, MaxSize)
@@ -423,14 +403,12 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
         Parent = Instance,
     })
 
-    local triSize = GripVisualSize + 2
-
-    local GripClip = Library:Create('Frame', {
-        Name = 'GripClip',
+    local GripVisual = Library:Create('Frame', {
+        Name = 'GripVisual',
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         ClipsDescendants = true,
-        Size = UDim2.fromOffset(triSize, triSize),
+        Size = UDim2.fromOffset(GripVisualSize, GripVisualSize),
         Position = UDim2.new(1, 0, 1, 0),
         AnchorPoint = Vector2.new(1, 1),
         ZIndex = 51,
@@ -443,16 +421,22 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
         BackgroundColor3 = Library.AccentColor,
         BackgroundTransparency = 0.3,
         BorderSizePixel = 0,
-        Size = UDim2.fromOffset(triSize * 2, triSize * 2),
-        Position = UDim2.fromOffset(triSize, 0),
-        AnchorPoint = Vector2.new(0.5, 0),
-        Rotation = 45,
+        Size = UDim2.fromOffset(GripVisualSize * 2, GripVisualSize * 2),
+        Position = UDim2.fromOffset(GripVisualSize, GripVisualSize),
+        AnchorPoint = Vector2.new(0.5, 0.5),
         ZIndex = 52,
         Active = false,
-        Parent = GripClip,
+        Parent = GripVisual,
     })
 
-    Library:AddToRegistry(GripSector, { BackgroundColor3 = 'AccentColor' })
+    Library:Create('UICorner', {
+        CornerRadius = UDim.new(1, 0),
+        Parent = GripSector,
+    })
+
+    Library:AddToRegistry(GripSector, {
+        BackgroundColor3 = 'AccentColor',
+    })
 
     local isResizing = false
 
@@ -461,7 +445,7 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
     end
 
     Grip.MouseEnter:Connect(function()
-        set_grip_alpha(0.0)
+        set_grip_alpha(0.15)
     end)
 
     Grip.MouseLeave:Connect(function()
@@ -477,7 +461,7 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
         end
 
         isResizing = true
-        set_grip_alpha(0.0)
+        set_grip_alpha(0.1)
 
         local startSize = Instance.AbsoluteSize
         local startPos  = Instance.AbsolutePosition
@@ -488,16 +472,14 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
             Instance.Position = UDim2.fromOffset(startPos.X, startPos.Y)
         end
 
-        local HasMoved = false
-        local Wireframe = nil
-        local ChangedConn, EndedConn
-
         local function get_viewport()
             local cam = workspace.CurrentCamera
             return (cam and cam.ViewportSize) or Vector2.new(1920, 1080)
         end
 
-        ChangedConn = InputService.InputChanged:Connect(function(Change)
+        local changedConn, endedConn
+
+        changedConn = InputService.InputChanged:Connect(function(Change)
             if Change.UserInputType ~= Enum.UserInputType.MouseMovement
                 and Change.UserInputType ~= Enum.UserInputType.Touch
                 and Change ~= Input then
@@ -505,61 +487,31 @@ function Library:MakeResizable(Instance, MinSize, MaxSize)
             end
 
             local Delta = Change.Position - dragStart
-            if not HasMoved and Delta.Magnitude <= 2 then return end
-            HasMoved = true
-
             local vp = get_viewport()
-            local maxW = math.min(MaxSize.X, vp.X - startPos.X)
-            local maxH = math.min(MaxSize.Y, vp.Y - startPos.Y)
 
-            local newW = math.clamp(startSize.X + Delta.X, MinSize.X, math.max(MinSize.X, maxW))
-            local newH = math.clamp(startSize.Y + Delta.Y, MinSize.Y, math.max(MinSize.Y, maxH))
-            local newSize = UDim2.fromOffset(newW, newH)
+            local max_w = math.max(100, vp.X - startPos.X - 4)
+            local max_h = math.max(100, vp.Y - startPos.Y - 4)
 
-            if Library.WireframeDrag then
-                if not Wireframe then
-                    Wireframe = Library:Create('Frame', {
-                        Name = 'ResizeWireframe',
-                        Size = UDim2.fromOffset(startSize.X, startSize.Y),
-                        Position = UDim2.fromOffset(startPos.X, startPos.Y),
-                        AnchorPoint = Vector2.new(0, 0),
-                        BackgroundTransparency = 1,
-                        Active = false,
-                        ZIndex = 100000,
-                        Parent = ScreenGui,
-                    })
+            local effective_min_w = math.min(MinSize.X, max_w)
+            local effective_min_h = math.min(MinSize.Y, max_h)
 
-                    Library:Create('UIStroke', {
-                        Color = Library.AccentColor,
-                        Thickness = 1,
-                        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-                        Parent = Wireframe
-                    })
-                end
+            local limit_max_w = math.max(effective_min_w, math.min(MaxSize.X, max_w))
+            local limit_max_h = math.max(effective_min_h, math.min(MaxSize.Y, max_h))
 
-                Wireframe.Size = newSize
-            else
-                Instance.Size = newSize
-            end
+            local newW = math.clamp(startSize.X + Delta.X, effective_min_w, limit_max_w)
+            local newH = math.clamp(startSize.Y + Delta.Y, effective_min_h, limit_max_h)
+
+            Instance.Size = UDim2.fromOffset(newW, newH)
         end)
 
-        EndedConn = InputService.InputEnded:Connect(function(EndInput)
-            if EndInput ~= Input
-                and EndInput.UserInputType ~= Enum.UserInputType.Touch
-                and EndInput.UserInputType ~= Enum.UserInputType.MouseButton1 then
-                return
-            end
-
-            ChangedConn:Disconnect()
-            EndedConn:Disconnect()
-            isResizing = false
-            set_grip_alpha(0.3)
-
-            if Library.WireframeDrag and Wireframe then
-                if HasMoved then
-                    Instance.Size = Wireframe.Size
-                end
-                Wireframe:Destroy()
+        endedConn = InputService.InputEnded:Connect(function(EndInput)
+            if EndInput == Input
+                or EndInput.UserInputType == Enum.UserInputType.Touch
+                or EndInput.UserInputType == Enum.UserInputType.MouseButton1 then
+                if changedConn then changedConn:Disconnect(); changedConn = nil end
+                if endedConn then endedConn:Disconnect(); endedConn = nil end
+                isResizing = false
+                set_grip_alpha(0.3)
             end
         end)
     end)
@@ -2933,17 +2885,23 @@ do
             Visible = false;
             Parent = ScreenGui;
         });
+        local current_list_y = MAX_DROPDOWN_ITEMS * 20 + 2;
         local function RecalculateListPosition()
             ListOuter.Position = UDim2.fromOffset(DropdownOuter.AbsolutePosition.X, DropdownOuter.AbsolutePosition.Y + DropdownOuter.Size.Y.Offset + 1);
         end;
 
         local function RecalculateListSize(YSize)
-            ListOuter.Size = UDim2.fromOffset(DropdownOuter.AbsoluteSize.X, YSize or (MAX_DROPDOWN_ITEMS * 20 + 2))
+            if YSize then current_list_y = YSize end
+            ListOuter.Size = UDim2.fromOffset(DropdownOuter.AbsoluteSize.X, current_list_y);
         end;
         RecalculateListPosition();
         RecalculateListSize();
 
         DropdownOuter:GetPropertyChangedSignal('AbsolutePosition'):Connect(RecalculateListPosition);
+        DropdownOuter:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
+            RecalculateListPosition();
+            RecalculateListSize();
+        end);
 
         local ListInner = Library:Create('Frame', {
             BackgroundColor3 = Library.MainColor;
@@ -3134,6 +3092,8 @@ do
         end;
 
         function Dropdown:OpenDropdown()
+            RecalculateListPosition();
+            RecalculateListSize();
             ListOuter.Visible = true;
             Library.OpenedFrames[ListOuter] = true;
             DropdownArrow.Rotation = 180;
@@ -3712,7 +3672,8 @@ function Library:CreateWindow(...)
 
     local Outer = Library:Create('Frame', {
         AnchorPoint = Config.AnchorPoint,
-        BackgroundTransparency = 1,
+        BackgroundColor3 = Color3.new(0, 0, 0);
+        BackgroundTransparency = 0;
         BorderSizePixel = 0;
         Position = Config.Position,
         Size = Config.Size,
@@ -3720,7 +3681,7 @@ function Library:CreateWindow(...)
         ZIndex = 1;
         Parent = ScreenGui;
     });
-    Library:MakeDraggable(Outer, 25, true);
+    local drag_handler = Library:MakeDraggable(Outer, 35, true);
 
     if Config.Resizable ~= false then
         local defaultSize = Vector2.new(Config.Size.X.Offset, Config.Size.Y.Offset)
@@ -3762,6 +3723,8 @@ function Library:CreateWindow(...)
         ZIndex = 1;
         Parent = Inner;
     });
+    Inner.InputBegan:Connect(drag_handler);
+    WindowLabel.InputBegan:Connect(drag_handler);
     local TabBarOuter = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
         BorderColor3 = Library.OutlineColor;
@@ -4531,8 +4494,8 @@ if Library.is_mobile or (InputService.TouchEnabled and not InputService.Keyboard
         end
     end)
 
-    BindMobileButtonAction(LockBtn, LockOuter, function()
-        Library.drag_locked = not Library.drag_locked
+    local function update_lock_visual()
+        if not LockBtn then return end
         if Library.drag_locked then
             LockBtn.Text = "unlock"
             LockBtn.TextColor3 = Library.AccentColor
@@ -4540,19 +4503,19 @@ if Library.is_mobile or (InputService.TouchEnabled and not InputService.Keyboard
             LockBtn.Text = "lock"
             LockBtn.TextColor3 = Library.FontColor
         end
+    end
+
+    BindMobileButtonAction(LockBtn, LockOuter, function()
+        Library.drag_locked = not Library.drag_locked
+        update_lock_visual()
     end)
 
     local _origUpdate = Library.UpdateColorsUsingRegistry
     Library.UpdateColorsUsingRegistry = function(self)
         _origUpdate(self)
-        if LockBtn then
-            if Library.drag_locked then
-                LockBtn.TextColor3 = Library.AccentColor
-            else
-                LockBtn.TextColor3 = Library.FontColor
-            end
-        end
+        update_lock_visual()
     end
+    update_lock_visual()
 end
 getgenv().Library = Library
 
