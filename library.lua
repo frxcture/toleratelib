@@ -1,4 +1,3 @@
---lmao
 local genv = (type(getgenv) == "function" and getgenv()) or _G
 if genv.library and type(genv.library.unload) == "function" then
     pcall(function() genv.library:unload() end)
@@ -3265,8 +3264,18 @@ do
         end;
 
         DropdownOuter.InputBegan:Connect(function(Input)
-            if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) and not Library:MouseIsOverOpenedFrame() then
-                if ListOuter.Visible then
+            if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
+                local wasOpen = ListOuter.Visible;
+
+                -- Close all other open dropdowns first (prevents stacking / mis-click issues)
+                for Frame, _ in next, Library.OpenedFrames do
+                    if Frame ~= ListOuter then
+                        Frame.Visible = false;
+                        Library.OpenedFrames[Frame] = nil;
+                    end;
+                end;
+
+                if wasOpen then
                     Dropdown:CloseDropdown();
                 else
                     Dropdown:OpenDropdown();
@@ -3276,11 +3285,19 @@ do
         InputService.InputBegan:Connect(function(Input)
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
                 local AbsPos, AbsSize = ListOuter.AbsolutePosition, ListOuter.AbsoluteSize;
+                local DropAbsPos = DropdownOuter.AbsolutePosition;
+                local DropAbsSize = DropdownOuter.AbsoluteSize;
 
-                if Mouse.X < AbsPos.X or Mouse.X > AbsPos.X + AbsSize.X
-                    or Mouse.Y < (AbsPos.Y - 20 - 1) or Mouse.Y > AbsPos.Y + AbsSize.Y then
+                -- Don't auto-close if the click was on this dropdown's own button
+                local overButton = Mouse.X >= DropAbsPos.X and Mouse.X <= DropAbsPos.X + DropAbsSize.X
+                    and Mouse.Y >= DropAbsPos.Y and Mouse.Y <= DropAbsPos.Y + DropAbsSize.Y;
 
-                    Dropdown:CloseDropdown();
+                if not overButton then
+                    if Mouse.X < AbsPos.X or Mouse.X > AbsPos.X + AbsSize.X
+                        or Mouse.Y < (AbsPos.Y - 20 - 1) or Mouse.Y > AbsPos.Y + AbsSize.Y then
+
+                        Dropdown:CloseDropdown();
+                    end;
                 end;
             end;
         end);
@@ -5275,4 +5292,3 @@ getgenv().theme_manager = Library.ThemeManager
 getgenv().save_manager = Library.SaveManager
 
 return Library
-
