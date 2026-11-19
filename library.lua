@@ -3284,14 +3284,31 @@ do
 
         DropdownOuter.InputBegan:Connect(function(Input)
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
-                local wasOpen = ListOuter.Visible;
-
-                -- Close all other open dropdowns first (prevents stacking / mis-click issues)
+                -- If the click lands inside any OTHER open dropdown list, ignore it.
+                -- That click belongs to that list's item handler, not to us.
                 for Frame, _ in next, Library.OpenedFrames do
                     if Frame ~= ListOuter then
-                        Frame.Visible = false;
-                        Library.OpenedFrames[Frame] = nil;
+                        local ap = Frame.AbsolutePosition;
+                        local as = Frame.AbsoluteSize;
+                        if Mouse.X >= ap.X and Mouse.X <= ap.X + as.X
+                            and Mouse.Y >= ap.Y and Mouse.Y <= ap.Y + as.Y then
+                            return; -- click is inside another open list, bail out
+                        end;
                     end;
+                end;
+
+                local wasOpen = ListOuter.Visible;
+
+                -- Close all other open dropdowns (collect first to avoid mutation-during-iteration)
+                local toClose = {};
+                for Frame, _ in next, Library.OpenedFrames do
+                    if Frame ~= ListOuter then
+                        table.insert(toClose, Frame);
+                    end;
+                end;
+                for _, Frame in ipairs(toClose) do
+                    Frame.Visible = false;
+                    Library.OpenedFrames[Frame] = nil;
                 end;
 
                 if wasOpen then
@@ -3303,20 +3320,22 @@ do
         end);
         InputService.InputBegan:Connect(function(Input)
             if (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
-                local AbsPos, AbsSize = ListOuter.AbsolutePosition, ListOuter.AbsoluteSize;
-                local DropAbsPos = DropdownOuter.AbsolutePosition;
-                local DropAbsSize = DropdownOuter.AbsoluteSize;
+                if not ListOuter.Visible then return; end;
 
-                -- Don't auto-close if the click was on this dropdown's own button
-                local overButton = Mouse.X >= DropAbsPos.X and Mouse.X <= DropAbsPos.X + DropAbsSize.X
-                    and Mouse.Y >= DropAbsPos.Y and Mouse.Y <= DropAbsPos.Y + DropAbsSize.Y;
+                local listPos  = ListOuter.AbsolutePosition;
+                local listSize = ListOuter.AbsoluteSize;
+                local dropPos  = DropdownOuter.AbsolutePosition;
+                local dropSize = DropdownOuter.AbsoluteSize;
 
-                if not overButton then
-                    if Mouse.X < AbsPos.X or Mouse.X > AbsPos.X + AbsSize.X
-                        or Mouse.Y < (AbsPos.Y - 20 - 1) or Mouse.Y > AbsPos.Y + AbsSize.Y then
+                -- Close only if the click is outside BOTH the list AND the button
+                -- (works correctly for both upward and downward opening lists)
+                local overList = Mouse.X >= listPos.X and Mouse.X <= listPos.X + listSize.X
+                    and Mouse.Y >= listPos.Y and Mouse.Y <= listPos.Y + listSize.Y;
+                local overButton = Mouse.X >= dropPos.X and Mouse.X <= dropPos.X + dropSize.X
+                    and Mouse.Y >= dropPos.Y and Mouse.Y <= dropPos.Y + dropSize.Y;
 
-                        Dropdown:CloseDropdown();
-                    end;
+                if not overList and not overButton then
+                    Dropdown:CloseDropdown();
                 end;
             end;
         end);
