@@ -40,6 +40,7 @@ end
 local is_mobile_detected = is_mobile()
 
 local InputService = game:GetService('UserInputService');
+local GuiService = game:GetService('GuiService');
 local TextService = game:GetService('TextService');
 local CoreGui = game:GetService('CoreGui');
 local Teams = game:GetService('Teams');
@@ -278,6 +279,16 @@ end;
 
 function Library:ApplyGlow(Inst)
 
+end;
+
+function Library:GetGuiInset()
+    if ScreenGui and ScreenGui.IgnoreGuiInset then
+        local ok, inset = pcall(function() return GuiService:GetGuiInset() end);
+        if ok and inset then
+            return inset;
+        end;
+    end;
+    return Vector2.zero;
 end;
 
 function Library:CreateLabel(Properties, IsHud)
@@ -1076,6 +1087,11 @@ do
             Parent = DisplayFrame;
         });
 
+        local function updatePickerPos()
+            local inset = Library:GetGuiInset();
+            PickerFrameOuter.Position = UDim2.fromOffset(DisplayFrame.AbsolutePosition.X + inset.X, DisplayFrame.AbsolutePosition.Y + inset.Y + 18);
+        end;
+
         local PickerFrameOuter = Library:Create('Frame', {
             Name = 'Color';
             BackgroundColor3 = Color3.new(1, 1, 1);
@@ -1086,9 +1102,8 @@ do
             ZIndex = 15;
             Parent = ScreenGui,
         });
-        DisplayFrame:GetPropertyChangedSignal('AbsolutePosition'):Connect(function()
-            PickerFrameOuter.Position = UDim2.fromOffset(DisplayFrame.AbsolutePosition.X, DisplayFrame.AbsolutePosition.Y + 18);
-        end)
+        updatePickerPos();
+        DisplayFrame:GetPropertyChangedSignal('AbsolutePosition'):Connect(updatePickerPos)
 
         local PickerFrameInner = Library:Create('Frame', {
             BackgroundColor3 = Library.BackgroundColor;
@@ -1703,6 +1718,11 @@ do
             ZIndex = 8;
             Parent = PickInner;
         });
+        local function updateModeSelectPos()
+            local inset = Library:GetGuiInset();
+            ModeSelectOuter.Position = UDim2.fromOffset(ToggleLabel.AbsolutePosition.X + ToggleLabel.AbsoluteSize.X + 4 + inset.X, ToggleLabel.AbsolutePosition.Y + inset.Y + 1);
+        end;
+
         local ModeSelectOuter = Library:Create('Frame', {
             BorderColor3 = Color3.new(0, 0, 0);
             Position = UDim2.fromOffset(ToggleLabel.AbsolutePosition.X + ToggleLabel.AbsoluteSize.X + 4, ToggleLabel.AbsolutePosition.Y + 1);
@@ -1711,9 +1731,8 @@ do
             ZIndex = 14;
             Parent = ScreenGui;
         });
-        ToggleLabel:GetPropertyChangedSignal('AbsolutePosition'):Connect(function()
-            ModeSelectOuter.Position = UDim2.fromOffset(ToggleLabel.AbsolutePosition.X + ToggleLabel.AbsoluteSize.X + 4, ToggleLabel.AbsolutePosition.Y + 1);
-        end);
+        updateModeSelectPos();
+        ToggleLabel:GetPropertyChangedSignal('AbsolutePosition'):Connect(updateModeSelectPos);
         local ModeSelectInner = Library:Create('Frame', {
             BackgroundColor3 = Library.BackgroundColor;
             BorderColor3 = Library.OutlineColor;
@@ -3020,8 +3039,9 @@ do
             local dropAbsPos  = DropdownOuter.AbsolutePosition;
             local dropAbsSize = DropdownOuter.AbsoluteSize;
             local height = (dropAbsSize.Y > 0 and dropAbsSize.Y) or 20;
+            local inset = Library:GetGuiInset();
             -- Always open downward, directly below the dropdown button
-            ListOuter.Position = UDim2.fromOffset(dropAbsPos.X, dropAbsPos.Y + height + 1);
+            ListOuter.Position = UDim2.fromOffset(dropAbsPos.X + inset.X, dropAbsPos.Y + inset.Y + height + 1);
         end;
 
         local function RecalculateListSize(YSize)
