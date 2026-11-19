@@ -1,4 +1,3 @@
---meoww
 local genv = (type(getgenv) == "function" and getgenv()) or _G
 if genv.library and type(genv.library.unload) == "function" then
     pcall(function() genv.library:unload() end)
@@ -3011,6 +3010,7 @@ do
         local ListOuter = Library:Create('Frame', {
             BackgroundColor3 = Color3.new(0, 0, 0);
             BorderColor3 = Color3.new(0, 0, 0);
+            AnchorPoint = Vector2.new(0, 0);
             ZIndex = 20;
             Visible = false;
             Parent = ScreenGui;
@@ -3019,8 +3019,9 @@ do
         local function RecalculateListPosition()
             local dropAbsPos  = DropdownOuter.AbsolutePosition;
             local dropAbsSize = DropdownOuter.AbsoluteSize;
+            local height = (dropAbsSize.Y > 0 and dropAbsSize.Y) or 20;
             -- Always open downward, directly below the dropdown button
-            ListOuter.Position = UDim2.fromOffset(dropAbsPos.X, dropAbsPos.Y + dropAbsSize.Y + 1);
+            ListOuter.Position = UDim2.fromOffset(dropAbsPos.X, dropAbsPos.Y + height + 1);
         end;
 
         local function RecalculateListSize(YSize)
