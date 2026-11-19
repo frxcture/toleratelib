@@ -117,8 +117,8 @@ local Library = {
     NotifyConfig = {
         Alignment = 'Left';
         BarSide   = 'Left';
-        PositionX = 0;
-        PositionY = 40;
+        PositionX = 20;
+        PositionY = 70;
     };
 };
 
@@ -1087,12 +1087,13 @@ do
             Parent = DisplayFrame;
         });
 
+        local PickerFrameOuter;
         local function updatePickerPos()
             local inset = Library:GetGuiInset();
             PickerFrameOuter.Position = UDim2.fromOffset(DisplayFrame.AbsolutePosition.X + inset.X, DisplayFrame.AbsolutePosition.Y + inset.Y + 18);
         end;
 
-        local PickerFrameOuter = Library:Create('Frame', {
+        PickerFrameOuter = Library:Create('Frame', {
             Name = 'Color';
             BackgroundColor3 = Color3.new(1, 1, 1);
             BorderColor3 = Color3.new(0, 0, 0);
@@ -1718,12 +1719,13 @@ do
             ZIndex = 8;
             Parent = PickInner;
         });
+        local ModeSelectOuter;
         local function updateModeSelectPos()
             local inset = Library:GetGuiInset();
             ModeSelectOuter.Position = UDim2.fromOffset(ToggleLabel.AbsolutePosition.X + ToggleLabel.AbsoluteSize.X + 4 + inset.X, ToggleLabel.AbsolutePosition.Y + inset.Y + 1);
         end;
 
-        local ModeSelectOuter = Library:Create('Frame', {
+        ModeSelectOuter = Library:Create('Frame', {
             BorderColor3 = Color3.new(0, 0, 0);
             Position = UDim2.fromOffset(ToggleLabel.AbsolutePosition.X + ToggleLabel.AbsoluteSize.X + 4, ToggleLabel.AbsolutePosition.Y + 1);
             Size = UDim2.new(0, 60, 0, 45 + 2);
@@ -2262,9 +2264,8 @@ do
 
                 if Button.DoubleClick then
                     Library:RemoveFromRegistry(Button.Label)
-                    Library:AddToRegistry(Button.Label, { TextColor3 = 'AccentColor' })
 
-                    Button.Label.TextColor3 = Library.AccentColor
+                    Button.Label.TextColor3 = Color3.fromRGB(240, 70, 70)
                     Button.Label.Text = ForceLowerCase('Are you sure?')
                     Button.Locked = true
 
@@ -5096,16 +5097,15 @@ local SaveManager = {} do
 		}
 
 		for idx, toggle in next, Toggles do
-			if self.Ignore[idx] then end
-
-			table.insert(data.objects, self.Parser[toggle.Type].Save(idx, toggle))
+			if not self.Ignore[idx] and self.Parser[toggle.Type] then
+				table.insert(data.objects, self.Parser[toggle.Type].Save(idx, toggle))
+			end
 		end
 
 		for idx, option in next, Options do
-			if not self.Parser[option.Type] then end
-			if self.Ignore[idx] then end
-
-			table.insert(data.objects, self.Parser[option.Type].Save(idx, option))
+			if not self.Ignore[idx] and self.Parser[option.Type] then
+				table.insert(data.objects, self.Parser[option.Type].Save(idx, option))
+			end
 		end	
 
 		local success, encoded = pcall(httpService.JSONEncode, httpService, data)
@@ -5129,7 +5129,7 @@ local SaveManager = {} do
 		if not success then return false, 'decode error' end
 
 		for _, option in next, decoded.objects do
-			if self.Parser[option.type] then
+			if not self.Ignore[option.idx] and self.Parser[option.type] then
 				task.spawn(function() self.Parser[option.type].Load(option.idx, option) end)
 			end
 		end
@@ -5233,6 +5233,9 @@ local SaveManager = {} do
 			Options.SaveManager_ConfigList:SetValue(nil)
 		end):AddButton('Load config', function()
 			local name = Options.SaveManager_ConfigList.Value
+			if not name or name == '' then
+				return self.Library:Notify('Please select a config first', 2)
+			end
 
 			local success, err = self:Load(name)
 			if not success then
@@ -5244,6 +5247,9 @@ local SaveManager = {} do
 
 		section:AddButton({ Text = 'Overwrite config', DoubleClick = true, Func = function()
 			local name = Options.SaveManager_ConfigList.Value
+			if not name or name == '' then
+				return self.Library:Notify('Please select a config first', 2)
+			end
 
 			local success, err = self:Save(name)
 			if not success then
@@ -5260,8 +5266,8 @@ local SaveManager = {} do
 
 		section:AddButton('Set autoload', function()
 			local name = Options.SaveManager_ConfigList.Value
-			if (not name) then
-				return;
+			if not name or name == '' then
+				return self.Library:Notify('Please select a config first', 2)
 			end;
 			writefile(self.Folder .. '/settings/autoload.txt', name)
 			SaveManager.AutoloadLabel:SetText('Current autoload config: ' .. name)
