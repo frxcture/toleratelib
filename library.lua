@@ -1,3 +1,4 @@
+--meoww
 local genv = (type(getgenv) == "function" and getgenv()) or _G
 if genv.library and type(genv.library.unload) == "function" then
     pcall(function() genv.library:unload() end)
@@ -3015,32 +3016,17 @@ do
             Parent = ScreenGui;
         });
         local current_list_y = MAX_DROPDOWN_ITEMS * 20 + 2;
-        local list_opens_up = false;
         local function RecalculateListPosition()
             local dropAbsPos  = DropdownOuter.AbsolutePosition;
             local dropAbsSize = DropdownOuter.AbsoluteSize;
-            local vp = ScreenGui and ScreenGui.AbsoluteSize.Y > 0 and ScreenGui.AbsoluteSize.Y
-                or (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.Y)
-                or 1080;
-
-            local spaceBelow = vp - (dropAbsPos.Y + dropAbsSize.Y);
-            local spaceAbove = dropAbsPos.Y;
-
-            if spaceBelow >= current_list_y or spaceBelow >= spaceAbove then
-                -- enough room below (or more room below than above) → open downward
-                list_opens_up = false;
-                ListOuter.Position = UDim2.fromOffset(dropAbsPos.X, dropAbsPos.Y + dropAbsSize.Y + 1);
-            else
-                -- not enough room below → open upward
-                list_opens_up = true;
-                ListOuter.Position = UDim2.fromOffset(dropAbsPos.X, dropAbsPos.Y - current_list_y - 1);
-            end;
+            -- Always open downward, directly below the dropdown button
+            ListOuter.Position = UDim2.fromOffset(dropAbsPos.X, dropAbsPos.Y + dropAbsSize.Y + 1);
         end;
 
         local function RecalculateListSize(YSize)
             if YSize then current_list_y = YSize end
             ListOuter.Size = UDim2.fromOffset(DropdownOuter.AbsoluteSize.X, current_list_y);
-            RecalculateListPosition(); -- re-check direction since list height changed
+            RecalculateListPosition();
         end;
         RecalculateListPosition();
         RecalculateListSize();
